@@ -6,98 +6,21 @@ from urllib.parse import quote
 
 from aiohttp import ClientError, ClientResponse, ClientTimeout, request
 from bs4 import BeautifulSoup
-import voluptuous as vol
+
+from .error import (
+    InvalidAttribute,
+    InvalidConfig,
+    InvalidInfo,
+    InvalidToken,
+    RequestError,
+)
 
 _LOGGER = getLogger(__name__)
 
 Listener = Callable[[], None]
 
-CAP_COLOR_CONTROL = "ColorControl"
-CAP_COLOR_TEMP = "ColorTemperature"
-CAP_POWER_METER = "PowerMeter"
-CAP_SWITCH = "Switch"
-CAP_SWITCH_LEVEL = "SwitchLevel"
-CAP_THERMOSTAT = "Thermostat"
 
-ATTR_ACCELERATION = "acceleration"
-ATTR_BATTERY = "battery"
-ATTR_CARBON_MONOXIDE = "carbonMonoxide"
-ATTR_CONTACT = "contact"
-ATTR_HUMIDITY = "humidity"
-ATTR_ILLUMINANCE = "illuminance"
-ATTR_MOTION = "motion"
-ATTR_SMOKE = "smoke"
-ATTR_TEMPERATURE = "temperature"
-ATTR_UV = "ultravioletIndex"
-ATTR_WATER = "water"
-
-CMD_AUTO = "auto"
-CMD_AWAY = "away"
-CMD_COOL = "cool"
-CMD_ECO = "eco"
-CMD_EMERGENCY_HEAT = "emergencyHeat"
-CMD_FAN_AUTO = "fanAuto"
-CMD_FAN_CIRCULATE = "fanCirculate"
-CMD_FAN_ON = "fanOn"
-CMD_HEAT = "heat"
-CMD_OFF = "off"
-CMD_ON = "on"
-CMD_PRESENT = "present"
-CMD_SET_COLOR = "setColor"
-CMD_SET_COLOR_TEMP = "setColorTemperature"
-CMD_SET_HUE = "setHue"
-CMD_SET_LEVEL = "setLevel"
-CMD_SET_SAT = "setSaturation"
-CMD_SET_HEATING_SETPOINT = "setHeatingSetpoint"
-CMD_SET_COOLING_SETPOINT = "setCoolingSetpoint"
-CMD_SET_PRESENCE = "setPresence"
-CMD_SET_THERMOSTAT_MODE = "setThermostatMode"
-CMD_SET_FAN_MODE = "setThermostatFanMode"
-
-DEVICE_SCHEMA = vol.Schema({"id": str, "name": str, "label": str}, required=True)
-
-DEVICES_SCHEMA = vol.Schema([DEVICE_SCHEMA])
-
-ATTRIBUTE_SCHEMA = vol.Schema(
-    {
-        "name": str,
-        "dataType": vol.Any(str, None),
-        "currentValue": vol.Any(str, int, float, None),
-        vol.Optional("values"): vol.Any([str], [int]),
-    },
-    required=True,
-)
-
-CAPABILITY_SCHEMA = vol.Schema(
-    vol.Any(
-        str,
-        vol.Schema(
-            {"attributes": [{"name": str, "dataType": vol.Any(str, None)}]},
-            required=True,
-        ),
-    )
-)
-
-DEVICE_INFO_SCHEMA = vol.Schema(
-    {
-        "id": str,
-        "name": str,
-        "label": str,
-        "attributes": [ATTRIBUTE_SCHEMA],
-        "capabilities": [CAPABILITY_SCHEMA],
-        "commands": [str],
-    },
-    required=True,
-)
-
-CAPABILITIES_SCHEMA = vol.Schema({"capabilities": [CAPABILITY_SCHEMA]}, required=True)
-
-COMMAND_SCHEMA = vol.Schema({"command": str, "type": [str]}, required=True)
-
-COMMANDS_SCHEMA = vol.Schema([COMMAND_SCHEMA])
-
-
-class HubitatHub:
+class Hub:
     """A representation of a Hubitat hub."""
 
     api_url: str
@@ -235,7 +158,7 @@ class HubitatHub:
         return None
 
     async def set_event_url(self, event_url: str):
-        """Set the URL that Hubitat will POST events to."""
+        """Set the URL that Hubitat will POST device events to."""
         _LOGGER.info(f"Posting update to {self.api_url}/postURL/{event_url}")
         url = quote(event_url, safe="")
         await self._api_request(f"postURL/{url}")
@@ -287,13 +210,8 @@ class HubitatHub:
     async def _load_devices(self, force_refresh=False):
         """Load the current state of all devices."""
         if force_refresh or len(self._devices) == 0:
-            json = await self._api_request("devices")
-            try:
-                devices = DEVICES_SCHEMA(json)
-                _LOGGER.debug(f"Loaded device list")
-            except Exception as e:
-                _LOGGER.error(f"Invalid response: {json}")
-                raise e
+            devices = await self._api_request("devices")
+            _LOGGER.debug(f"Loaded device list")
 
             # load devices sequentially to avoid overloading the hub
             for dev in devices:
@@ -342,7 +260,7 @@ class HubitatHub:
             _LOGGER.debug(f"Loading device {device_id}")
             json = await self._api_request(f"devices/{device_id}")
             try:
-                self._devices[device_id] = DEVICE_INFO_SCHEMA(json)
+                self._devices[device_id] = json
             except Exception as e:
                 _LOGGER.error(f"Invalid device info: {json}")
                 raise e
@@ -382,31 +300,3 @@ def _parse_details(tag):
             details[_DETAILS_MAPPING[heading]] = content
         group = group.find_next_sibling("div")
     return details
-
-
-class ConnectionError(Exception):
-    """Error when hub isn't responding."""
-
-
-class InvalidToken(Exception):
-    """Error for invalid access token."""
-
-
-class InvalidConfig(Exception):
-    """Error indicating invalid hub config data."""
-
-
-class InvalidAttribute(Exception):
-    """Error indicating an invalid device attribute."""
-
-
-class InvalidInfo(Exception):
-    """Error indicating that the hub returned invalid general info."""
-
-
-class RequestError(Exception):
-    """An error indicating that a request failed."""
-
-    def __init__(self, resp: ClientResponse, **kwargs):
-        super().__init__(f"{resp.method} {resp.url} - [{resp.status}] {resp.reason}")
-
