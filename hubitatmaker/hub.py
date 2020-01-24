@@ -29,28 +29,37 @@ class Hub:
     token: str
 
     def __init__(self, host: str, app_id: str, access_token: str):
-        """Initialize a Hubitat hub connector."""
-        if not host:
-            raise InvalidConfig('Missing "host"')
-        if not app_id:
-            raise InvalidConfig('Missing "app_id"')
-        if not access_token:
-            raise InvalidConfig('Missing "access_token"')
+        """Initialize a Hubitat hub interface.
+
+        host:
+          The URL of the host to connect to (e.g., http://10.0.1.99), or just
+          the host name/address. If only a name or address are provided, http
+          is assumed.
+        app_id:
+          The ID of the Maker API instance this interface should use
+        access_token:
+          The access token for the Maker API instance
+        """
+        if not host or not app_id or not access_token:
+            raise InvalidConfig()
+
+        if not host.startswith("http"):
+            host = f"http://{host}"
 
         self.host = host
         self.app_id = app_id
         self.token = access_token
-        self.api_url = f"http://{host}/apps/api/{app_id}"
+        self.api_url = f"{host}/apps/api/{app_id}"
 
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._info: Dict[str, str] = {}
         self._listeners: Dict[str, List[Listener]] = {}
 
-        _LOGGER.debug(f"Created hub {self}")
+        _LOGGER.debug("Created hub %s", self)
 
     def __repr__(self):
         """Return a string representation of this hub."""
-        return f"<HubitatHub host={self.host} app_id={self.app_id}>"
+        return f"<Hub host={self.host} app_id={self.app_id}>"
 
     @property
     def id(self):
@@ -118,34 +127,16 @@ class Hub:
             raise ConnectionError(str(e))
 
     async def connect(self):
-        """
-        Connect to the hub and download initial state data.
+        """Connect to the hub and download initial state data.
 
         Hub and device data will not be available until this method has
         completed
         """
         try:
             await gather(self._load_info(), self._load_devices())
-            _LOGGER.debug(f"Connected to Hubitat hub at {self.host}")
+            _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except ClientError as e:
             raise ConnectionError(str(e))
-
-    def update_state(self, event: Dict[str, Any]):
-        """Update a device state with an event received from the hub."""
-        device_id = event["deviceId"]
-        self._update_device_attr(device_id, event["name"], event["value"])
-        if device_id in self._listeners:
-            for listener in self._listeners[device_id]:
-                listener()
-
-    async def send_command(
-        self, device_id: str, command: str, arg: Optional[Union[str, int]]
-    ):
-        """Send a device command to the hub."""
-        path = f"devices/{device_id}/{command}"
-        if arg:
-            path += f"/{arg}"
-        return await self._api_request(path)
 
     def get_device_attribute(
         self, device_id: str, attr_name: str
@@ -157,15 +148,32 @@ class Hub:
                 return attr
         return None
 
-    async def set_event_url(self, event_url: str):
-        """Set the URL that Hubitat will POST device events to."""
-        _LOGGER.info(f"Posting update to {self.api_url}/postURL/{event_url}")
-        url = quote(event_url, safe="")
-        await self._api_request(f"postURL/{url}")
-
     async def refresh_device(self, device_id: str):
         """Refresh a device's state."""
         await self._load_device(device_id, force_refresh=True)
+
+    async def send_command(
+        self, device_id: str, command: str, arg: Optional[Union[str, int]]
+    ):
+        """Send a device command to the hub."""
+        path = f"devices/{device_id}/{command}"
+        if arg:
+            path += f"/{arg}"
+        return await self._api_request(path)
+
+    async def set_event_url(self, event_url: str):
+        """Set the URL that Hubitat will POST device events to."""
+        _LOGGER.info("Posting update to %s/postURL/%s", self.api_url, event_url)
+        url = quote(event_url, safe="")
+        await self._api_request(f"postURL/{url}")
+
+    def update_state(self, event: Dict[str, Any]):
+        """Update a device state with an event received from the hub."""
+        device_id = event["deviceId"]
+        self._update_device_attr(device_id, event["name"], event["value"])
+        if device_id in self._listeners:
+            for listener in self._listeners[device_id]:
+                listener()
 
     async def _check_api(self):
         """Check for api access."""
@@ -175,11 +183,11 @@ class Hub:
         self, device_id: str, attr_name: str, value: Union[int, str]
     ):
         """Update a device attribute value."""
-        _LOGGER.debug(f"Updating {attr_name} of {device_id} to {value}")
+        _LOGGER.debug("Updating %s of %s to %s", attr_name, device_id, value)
         try:
             state = self._devices[device_id]
         except KeyError:
-            _LOGGER.warning(f"Tried to update unknown device {device_id}")
+            _LOGGER.warning("Tried to update unknown device %s", device_id)
             return
 
         for attr in state["attributes"]:
@@ -191,7 +199,7 @@ class Hub:
     async def _load_info(self):
         """Load general info about the hub."""
         url = f"http://{self.host}/hub/edit"
-        _LOGGER.info(f"Getting hub info from {url}...")
+        _LOGGER.info("Getting hub info from %s...", url)
         timeout = ClientTimeout(total=10)
         async with request("GET", url, timeout=timeout) as resp:
             if resp.status >= 400:
@@ -202,16 +210,16 @@ class Hub:
                 soup = BeautifulSoup(text, "html.parser")
                 section = soup.find("h2", string="Hub Details")
                 self._info = _parse_details(section)
-                _LOGGER.debug(f"Loaded hub info: {self._info}")
+                _LOGGER.debug("Loaded hub info: %s", self._info)
             except Exception as e:
-                _LOGGER.error(f"Error parsing hub info: {e}")
+                _LOGGER.error("Error parsing hub info: %s", e)
                 raise InvalidInfo()
 
     async def _load_devices(self, force_refresh=False):
         """Load the current state of all devices."""
         if force_refresh or len(self._devices) == 0:
             devices = await self._api_request("devices")
-            _LOGGER.debug(f"Loaded device list")
+            _LOGGER.debug("Loaded device list")
 
             # load devices sequentially to avoid overloading the hub
             for dev in devices:
@@ -257,14 +265,14 @@ class Hub:
         """
 
         if force_refresh or device_id not in self._devices:
-            _LOGGER.debug(f"Loading device {device_id}")
+            _LOGGER.debug("Loading device %s", device_id)
             json = await self._api_request(f"devices/{device_id}")
             try:
                 self._devices[device_id] = json
             except Exception as e:
-                _LOGGER.error(f"Invalid device info: {json}")
+                _LOGGER.error("Invalid device info: %s", json)
                 raise e
-            _LOGGER.debug(f"Loaded device {device_id}")
+            _LOGGER.debug("Loaded device %s", device_id)
 
     async def _api_request(self, path: str, method="GET"):
         params = {"access_token": self.token}
