@@ -1,6 +1,10 @@
 from aiohttp import ClientError, ClientResponse, ClientTimeout, request
 
 
+class NotReady(Exception):
+    """Error when hub connection isn't ready."""
+
+
 class ConnectionError(Exception):
     """Error when hub isn't responding."""
 

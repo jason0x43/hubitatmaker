@@ -3,8 +3,9 @@ from asyncio import gather
 from logging import getLogger
 from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import quote
+from functools import wraps
 
-from aiohttp import ClientError, ClientResponse, ClientTimeout, request
+import aiohttp
 from bs4 import BeautifulSoup
 
 from .error import (
@@ -12,6 +13,7 @@ from .error import (
     InvalidConfig,
     InvalidInfo,
     InvalidToken,
+    NotReady,
     RequestError,
 )
 
@@ -51,21 +53,47 @@ class Hub:
         self.token = access_token
         self.api_url = f"{host}/apps/api/{app_id}"
 
+        self._connected = False
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._info: Dict[str, str] = {}
         self._listeners: Dict[str, List[Listener]] = {}
 
-        _LOGGER.debug("Created hub %s", self)
+        _LOGGER.info("Created hub %s", self)
 
     def __repr__(self):
         """Return a string representation of this hub."""
         return f"<Hub host={self.host} app_id={self.app_id}>"
 
     @property
+    def devices(self):
+        """Return the devices managed by this hub."""
+        self._ensure_connected()
+        if len(self._devices) > 0:
+            return self._devices.values()
+        return None
+
+    @property
+    def hw_version(self):
+        """Return the hub's hardware version."""
+        self._ensure_connected()
+        if len(self._info) > 0:
+            return self._info["hw_version"]
+        return None
+
+    @property
     def id(self):
         """Return the ID of this hub."""
+        self._ensure_connected()
         if len(self._info) > 0:
             return self._info["id"]
+        return None
+
+    @property
+    def mac(self):
+        """Return the MAC address of this hub."""
+        self._ensure_connected()
+        if len(self._info) > 0:
+            return self._info["mac"]
         return None
 
     @property
@@ -74,31 +102,11 @@ class Hub:
         return "Hubitat Elevation"
 
     @property
-    def hw_version(self):
-        """Return the hub's hardware version."""
-        if len(self._info) > 0:
-            return self._info["hw_version"]
-        return None
-
-    @property
     def sw_version(self):
         """Return the hub's software version."""
+        self._ensure_connected()
         if len(self._info) > 0:
             return self._info["sw_version"]
-        return None
-
-    @property
-    def mac(self):
-        """Return the MAC address of this hub."""
-        if len(self._info) > 0:
-            return self._info["mac"]
-        return None
-
-    @property
-    def devices(self):
-        """Return the devices managed by this hub."""
-        if len(self._devices) > 0:
-            return self._devices.values()
         return None
 
     def add_device_listener(self, device_id: str, listener: Listener):
@@ -123,7 +131,7 @@ class Hub:
         """Verify that the hub is accessible."""
         try:
             await gather(self._load_info(), self._check_api())
-        except ClientError as e:
+        except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
 
     async def connect(self):
@@ -134,14 +142,16 @@ class Hub:
         """
         try:
             await gather(self._load_info(), self._load_devices())
+            self._connected = True
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
-        except ClientError as e:
+        except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
 
     def get_device_attribute(
         self, device_id: str, attr_name: str
     ) -> Optional[Dict[str, Any]]:
         """Get an attribute value for a specific device."""
+        self._ensure_connected()
         state = self._devices[device_id]
         for attr in state["attributes"]:
             if attr["name"] == attr_name:
@@ -198,10 +208,10 @@ class Hub:
 
     async def _load_info(self):
         """Load general info about the hub."""
-        url = f"http://{self.host}/hub/edit"
+        url = f"{self.host}/hub/edit"
         _LOGGER.info("Getting hub info from %s...", url)
-        timeout = ClientTimeout(total=10)
-        async with request("GET", url, timeout=timeout) as resp:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.request("GET", url, timeout=timeout) as resp:
             if resp.status >= 400:
                 raise RequestError(resp)
 
@@ -226,8 +236,7 @@ class Hub:
                 await self._load_device(dev["id"], force_refresh)
 
     async def _load_device(self, device_id: str, force_refresh=False):
-        """
-        Return full info for a specific device.
+        """Return full info for a specific device.
 
         {
             "id": "1922",
@@ -275,8 +284,11 @@ class Hub:
             _LOGGER.debug("Loaded device %s", device_id)
 
     async def _api_request(self, path: str, method="GET"):
+        """Make a Maker API request."""
         params = {"access_token": self.token}
-        async with request(method, f"{self.api_url}/{path}", params=params) as resp:
+        async with aiohttp.request(
+            method, f"{self.api_url}/{path}", params=params
+        ) as resp:
             if resp.status >= 400:
                 if resp.status == 401:
                     raise InvalidToken()
@@ -286,6 +298,11 @@ class Hub:
             if "error" in json and json["error"]:
                 raise RequestError(resp)
             return json
+
+    def _ensure_connected(self):
+        """Ensure an initial connection has been established."""
+        if not self._connected:
+            raise NotReady()
 
 
 _DETAILS_MAPPING = {

@@ -2,3 +2,4 @@
 .envrc
 .mypy_cache/
 *.egg-info/
+.eggs/
