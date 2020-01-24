@@ -13,7 +13,7 @@ async def print_devices(host, app_id, token):
 	hub = Hub(host, app_id, token)
 	await hub.connect()
 	for device in hub.devices:
-		print(f"{device.name} ({device.id}}")
+		print(f"{device.name} ({device.id})")
 
 if __name__ == '__main__':
 	host = 'http://10.0.1.99'
