@@ -3,3 +3,5 @@
 .mypy_cache/
 *.egg-info/
 .eggs/
+build/
+dist/
