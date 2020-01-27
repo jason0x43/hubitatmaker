@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import sys
 from os.path import dirname, join
 from typing import Any, Coroutine, Dict, List
@@ -13,6 +14,12 @@ with open(join(dirname(__file__), "hub_edit.html")) as f:
 
 with open(join(dirname(__file__), "devices.json")) as f:
     devices = f.read()
+
+with open(join(dirname(__file__), "device_details.json")) as f:
+    device_details = json.loads(f.read())
+
+with open(join(dirname(__file__), "events.json")) as f:
+    events = json.loads(f.read())
 
 
 def run(cr: Coroutine) -> Any:
@@ -31,6 +38,10 @@ class FakeResponse:
         return self._text
 
 
+class FakeServer:
+    url = "http://localhost:9999"
+
+
 requests: List[Dict[str, Any]] = []
 
 
@@ -43,7 +54,14 @@ class fake_request:
         elif url.endswith("/devices"):
             self.response = FakeResponse(text=devices)
         else:
-            self.response = FakeResponse(text="{}")
+            dev_match = re.match(".*/devices/(\\d+)$", url)
+            if dev_match:
+                dev_id = dev_match.group(1)
+                self.response = FakeResponse(
+                    text=json.dumps(device_details.get(dev_id, {}))
+                )
+            else:
+                self.response = FakeResponse(text="{}")
 
         requests.append({"method": method, "url": url, "data": kwargs})
 
@@ -81,25 +99,59 @@ class TestHub(TestCase):
         self.assertEqual(hub.name, "Hubitat Elevation")
 
     @patch("aiohttp.request", new=fake_request)
-    def test_connect(self):
-        """connect() should request data from the Hubitat hub."""
+    def test_start(self):
+        """start() should request data from the Hubitat hub."""
         hub = Hub("1.2.3.4", "1234", "token")
-        run(hub.connect())
+        run(hub.start())
         self.assertGreaterEqual(len(requests), 2)
         self.assertRegex(requests[0]["url"], "/hub/edit$")
         self.assertRegex(requests[1]["url"], "devices$")
 
     @patch("aiohttp.request", new=fake_request)
     def test_info_parsed(self):
-        """Connected hub should have parsed Hubitat info."""
+        """Started hub should have parsed Hubitat info."""
         hub = Hub("1.2.3.4", "1234", "token")
-        run(hub.connect())
+        run(hub.start())
         self.assertEqual(hub.id, "1234abcd-1234-abcd-1234-abcd1234abcd")
         self.assertEqual(hub.mac, "12:34:56:78:9A:BC")
 
     @patch("aiohttp.request", new=fake_request)
     def test_devices_loaded(self):
-        """Connected hub should have parsed device info."""
+        """Started hub should have parsed device info."""
         hub = Hub("1.2.3.4", "1234", "token")
-        run(hub.connect())
+        run(hub.start())
         self.assertEqual(len(hub.devices), 9)
+
+    @patch("aiohttp.request", new=fake_request)
+    def test_process_event(self):
+        """Started hub should process a device event."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        run(hub.start())
+        attr = hub.get_device_attribute("176", "switch")
+        self.assertEqual(attr["currentValue"], "off")
+
+        hub.process_event(events[0])
+
+        attr = hub.get_device_attribute("176", "switch")
+        self.assertEqual(attr["currentValue"], "on")
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("hubitatmaker.server.start_server")
+    def test_start_server(self, mock_start_server):
+        """Hub should start a server when asked to."""
+        hub = Hub("1.2.3.4", "1234", "token", True)
+        run(hub.start())
+        self.assertTrue(mock_start_server.called)
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("hubitatmaker.server.stop_server")
+    @patch("hubitatmaker.server.start_server")
+    def test_stop_server(self, mock_start_server, mock_stop_server):
+        """Hub should stop a server when stopped."""
+        mock_start_server.return_value = FakeServer()
+        hub = Hub("1.2.3.4", "1234", "token", True)
+        run(hub.start())
+        self.assertTrue(mock_start_server.called)
+        self.assertFalse(mock_stop_server.called)
+        hub.stop()
+        self.assertTrue(mock_stop_server.called)

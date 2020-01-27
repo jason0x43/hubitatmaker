@@ -8,6 +8,7 @@ from functools import wraps
 import aiohttp
 from bs4 import BeautifulSoup
 
+from . import server
 from .error import (
     InvalidAttribute,
     InvalidConfig,
@@ -23,14 +24,21 @@ Listener = Callable[[], None]
 
 
 class Hub:
-    """A representation of a Hubitat hub."""
+    """A representation of a Hubitat hub.
+
+    This class downloads initial device data from a Hubitat hub and waits for the 
+    hub to push it state updates for devices. This means that the class must be
+    able to receive update events. There are two ways to handle this: by relying on external code to pass in update events via this class's 
+    """
 
     api_url: str
     app_id: str
     host: str
     token: str
 
-    def __init__(self, host: str, app_id: str, access_token: str):
+    def __init__(
+        self, host: str, app_id: str, access_token: str, self_serve: bool = False
+    ):
         """Initialize a Hubitat hub interface.
 
         host:
@@ -41,6 +49,10 @@ class Hub:
           The ID of the Maker API instance this interface should use
         access_token:
           The access token for the Maker API instance
+        self_serve:
+          If true, start an HTTP server to listen for device events from the
+          hub. By default this class relies on the instantiating code to pass
+          it update events.
         """
         if not host or not app_id or not access_token:
             raise InvalidConfig()
@@ -53,10 +65,11 @@ class Hub:
         self.token = access_token
         self.api_url = f"{host}/apps/api/{app_id}"
 
-        self._connected = False
+        self._started = False
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._info: Dict[str, str] = {}
         self._listeners: Dict[str, List[Listener]] = {}
+        self._self_serve = self_serve
 
         _LOGGER.info("Created hub %s", self)
 
@@ -66,92 +79,108 @@ class Hub:
 
     @property
     def devices(self):
-        """Return the devices managed by this hub."""
-        self._ensure_connected()
+        """Return a list of devices managed by the Hubitat hub."""
+        self._ensure_started()
         if len(self._devices) > 0:
             return self._devices.values()
         return None
 
     @property
     def hw_version(self):
-        """Return the hub's hardware version."""
-        self._ensure_connected()
+        """Return the Hubitat hub's hardware version."""
+        self._ensure_started()
         if len(self._info) > 0:
             return self._info["hw_version"]
         return None
 
     @property
     def id(self):
-        """Return the ID of this hub."""
-        self._ensure_connected()
+        """Return the unique ID of the Hubitat hub."""
+        self._ensure_started()
         if len(self._info) > 0:
             return self._info["id"]
         return None
 
     @property
     def mac(self):
-        """Return the MAC address of this hub."""
-        self._ensure_connected()
+        """Return the MAC address of the Hubitat hub."""
+        self._ensure_started()
         if len(self._info) > 0:
             return self._info["mac"]
         return None
 
     @property
     def name(self):
-        """Return the device name for hub."""
+        """Return the device name for the Hubitat hub."""
         return "Hubitat Elevation"
 
     @property
     def sw_version(self):
-        """Return the hub's software version."""
-        self._ensure_connected()
+        """Return the Hubitat hub's software version."""
+        self._ensure_started()
         if len(self._info) > 0:
             return self._info["sw_version"]
         return None
 
     def add_device_listener(self, device_id: str, listener: Listener):
-        """Listen for updates for a device."""
+        """Listen for updates for a particular device."""
         if device_id not in self._listeners:
             self._listeners[device_id] = []
         self._listeners[device_id].append(listener)
 
     def remove_device_listeners(self, device_id: str):
-        """Remove all listeners for a device."""
+        """Remove all listeners for a particular device."""
         self._listeners[device_id] = []
 
     def device_has_attribute(self, device_id: str, attr_name: str):
-        """Return True if the given device device has the given attribute."""
+        """Return True if the given device has the given attribute."""
         state = self._devices[device_id]
         for attr in state["attributes"]:
             if attr["name"] == attr_name:
                 return True
         return False
 
-    async def check_config(self):
-        """Verify that the hub is accessible."""
+    async def check_config(self) -> None:
+        """Verify that the hub is accessible.
+
+        This method will raise a ConnectionError if there was a problem
+        communicating with the hub.
+        """
         try:
             await gather(self._load_info(), self._check_api())
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
 
-    async def connect(self):
-        """Connect to the hub and download initial state data.
+    async def start(self) -> None:
+        """Download initial state data, and start an event server if requested.
 
         Hub and device data will not be available until this method has
-        completed
+        completed. Methods that rely on that data will raise an error if called
+        before this method has completed.
         """
         try:
+            if self._self_serve:
+                self._server = server.start_server(self.process_event, "10.0.1.100")
+                await self.set_event_url(self._server.url)
+
             await gather(self._load_info(), self._load_devices())
-            self._connected = True
+            self._started = True
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
+
+    def stop(self) -> None:
+        """Remove all listeners and stop the event server (if running)."""
+        if self._server:
+            server.stop_server(self._server)
+        self._listeners = {}
+        self._started = False
 
     def get_device_attribute(
         self, device_id: str, attr_name: str
     ) -> Optional[Dict[str, Any]]:
         """Get an attribute value for a specific device."""
-        self._ensure_connected()
+        self._ensure_started()
         state = self._devices[device_id]
         for attr in state["attributes"]:
             if attr["name"] == attr_name:
@@ -174,19 +203,24 @@ class Hub:
     async def set_event_url(self, event_url: str):
         """Set the URL that Hubitat will POST device events to."""
         _LOGGER.info("Posting update to %s/postURL/%s", self.api_url, event_url)
-        url = quote(event_url, safe="")
+        url = quote(str(event_url), safe="")
         await self._api_request(f"postURL/{url}")
 
-    def update_state(self, event: Dict[str, Any]):
-        """Update a device state with an event received from the hub."""
-        device_id = event["deviceId"]
-        self._update_device_attr(device_id, event["name"], event["value"])
+    def process_event(self, event: Dict[str, Any]):
+        """Process an event received from the hub."""
+        _LOGGER.debug("received event: %s", event)
+        content = event["content"]
+        device_id = content["deviceId"]
+        self._update_device_attr(device_id, content["name"], content["value"])
         if device_id in self._listeners:
             for listener in self._listeners[device_id]:
                 listener()
 
     async def _check_api(self):
-        """Check for api access."""
+        """Check for api access.
+
+        An error will be raised if a test API request fails.
+        """
         await self._api_request("devices")
 
     def _update_device_attr(
@@ -299,9 +333,9 @@ class Hub:
                 raise RequestError(resp)
             return json
 
-    def _ensure_connected(self):
-        """Ensure an initial connection has been established."""
-        if not self._connected:
+    def _ensure_started(self):
+        """Ensure this Hub has been started."""
+        if not self._started:
             raise NotReady()
 
 

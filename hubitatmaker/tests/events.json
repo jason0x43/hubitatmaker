@@ -1,0 +1,13 @@
+[
+   {
+      "content": {
+         "name": "switch",
+         "value": "on",
+         "displayName": "Loft Fan",
+         "descriptionText": "Loft Fan is on",
+         "deviceId": "176",
+         "unit": null,
+         "data": null
+      }
+   }
+]
