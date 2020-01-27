@@ -208,14 +208,11 @@ class Hub:
 
     def process_event(self, event: Dict[str, Any]):
         """Process an event received from the hub."""
-        _LOGGER.debug(
-            "received event for for %s (%s) - %s -> %s",
-            event["displayName"],
-            event["deviceId"],
-            event["name"],
-            event["value"],
-        )
         content = event["content"]
+        _LOGGER.debug(
+            "received event for for %(displayName)s (%(deviceId)s) - %(name)s -> %(value)s",
+            content,
+        )
         device_id = content["deviceId"]
         self._update_device_attr(device_id, content["name"], content["value"])
         if device_id in self._listeners:
