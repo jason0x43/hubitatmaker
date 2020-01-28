@@ -3,11 +3,11 @@ import json
 import re
 import sys
 from os.path import dirname, join
-from typing import Any, Coroutine, Dict, List
+from typing import Any, Coroutine, Dict, List, cast
 from unittest import TestCase
 from unittest.mock import patch
 
-from hubitatmaker.hub import Hub, InvalidConfig, NotReady
+from hubitatmaker.hub import Hub, InvalidConfig
 
 with open(join(dirname(__file__), "hub_edit.html")) as f:
     hub_edit_page = f.read()
@@ -84,19 +84,23 @@ class TestHub(TestCase):
         Hub("1.2.3.4", "1234", "token")
 
     def test_connection_required(self) -> None:
-        """Some property and method accesses should fail without a connection."""
+        """Some property and method accesses return unknown without a connection."""
         hub = Hub("1.2.3.4", "1234", "token")
-        self.assertRaises(NotReady, getattr, hub, "devices")
-        self.assertRaises(NotReady, getattr, hub, "hw_version")
-        self.assertRaises(NotReady, getattr, hub, "id")
-        self.assertRaises(NotReady, getattr, hub, "mac")
-        self.assertRaises(NotReady, getattr, hub, "sw_version")
-        self.assertRaises(NotReady, hub.get_device_attribute, "foo", "bar")
+        self.assertEqual(list(hub.devices), [])
+        self.assertEqual(hub.hw_version, "unknown")
+        self.assertEqual(hub.mac, "unknown")
+        self.assertEqual(hub.sw_version, "unknown")
+        hub.get_device_attribute("foo", "bar")
 
     def test_hub_name(self) -> None:
         """A hub should return its name."""
         hub = Hub("1.2.3.4", "1234", "token")
         self.assertEqual(hub.name, "Hubitat Elevation")
+
+    def test_hub_id(self) -> None:
+        """A hub should return its id."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        self.assertEqual(hub.id, "1.2.3.4::1234")
 
     @patch("aiohttp.request", new=fake_request)
     def test_start(self):
@@ -112,7 +116,7 @@ class TestHub(TestCase):
         """Started hub should have parsed Hubitat info."""
         hub = Hub("1.2.3.4", "1234", "token")
         run(hub.start())
-        self.assertEqual(hub.id, "1234abcd-1234-abcd-1234-abcd1234abcd")
+        self.assertEqual(hub.id, "1.2.3.4::1234")
         self.assertEqual(hub.mac, "12:34:56:78:9A:BC")
 
     @patch("aiohttp.request", new=fake_request)

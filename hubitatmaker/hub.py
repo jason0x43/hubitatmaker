@@ -1,9 +1,10 @@
 """Hubitat API."""
 from asyncio import gather
-from logging import getLogger
-from typing import Any, Callable, Dict, List, Optional, Union
-from urllib.parse import quote
 from functools import wraps
+from logging import getLogger
+import re
+from typing import Any, Callable, Dict, List, Optional, Union, ValuesView, cast
+from urllib.parse import quote, urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -14,7 +15,6 @@ from .error import (
     InvalidConfig,
     InvalidInfo,
     InvalidToken,
-    NotReady,
     RequestError,
 )
 
@@ -34,6 +34,7 @@ class Hub:
     api_url: str
     app_id: str
     host: str
+    scheme: str
     token: str
 
     def __init__(
@@ -57,14 +58,15 @@ class Hub:
         if not host or not app_id or not access_token:
             raise InvalidConfig()
 
-        if not host.startswith("http"):
-            host = f"http://{host}"
+        host_url = urlparse(host)
 
-        self.host = host
+        self.scheme = host_url.scheme or "http"
+        self.host = host_url.netloc or host_url.path
         self.app_id = app_id
         self.token = access_token
-        self.api_url = f"{host}/apps/api/{app_id}"
+        self.api_url = f"{self.scheme}://{self.host}/apps/api/{app_id}"
 
+        self._mac: Optional[str] = None
         self._started = False
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._info: Dict[str, str] = {}
@@ -73,54 +75,39 @@ class Hub:
 
         _LOGGER.info("Created hub %s", self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return a string representation of this hub."""
         return f"<Hub host={self.host} app_id={self.app_id}>"
 
     @property
-    def devices(self):
+    def devices(self) -> ValuesView[Dict[str, Any]]:
         """Return a list of devices managed by the Hubitat hub."""
-        self._ensure_started()
-        if len(self._devices) > 0:
-            return self._devices.values()
-        return None
+        return self._devices.values()
 
     @property
-    def hw_version(self):
+    def hw_version(self) -> Optional[str]:
         """Return the Hubitat hub's hardware version."""
-        self._ensure_started()
-        if len(self._info) > 0:
-            return self._info["hw_version"]
-        return None
+        return self._info.get("hw_version", "unknown")
 
     @property
-    def id(self):
+    def id(self) -> str:
         """Return the unique ID of the Hubitat hub."""
-        self._ensure_started()
-        if len(self._info) > 0:
-            return self._info["id"]
-        return None
+        return f"{self.host}::{self.app_id}"
 
     @property
-    def mac(self):
+    def mac(self) -> str:
         """Return the MAC address of the Hubitat hub."""
-        self._ensure_started()
-        if len(self._info) > 0:
-            return self._info["mac"]
-        return None
+        return self._info.get("mac", "unknown")
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the device name for the Hubitat hub."""
         return "Hubitat Elevation"
 
     @property
-    def sw_version(self):
+    def sw_version(self) -> str:
         """Return the Hubitat hub's software version."""
-        self._ensure_started()
-        if len(self._info) > 0:
-            return self._info["sw_version"]
-        return None
+        return self._info.get("sw_version", "unknown")
 
     def add_device_listener(self, device_id: str, listener: Listener):
         """Listen for updates for a particular device."""
@@ -180,11 +167,11 @@ class Hub:
         self, device_id: str, attr_name: str
     ) -> Optional[Dict[str, Any]]:
         """Get an attribute value for a specific device."""
-        self._ensure_started()
-        state = self._devices[device_id]
-        for attr in state["attributes"]:
-            if attr["name"] == attr_name:
-                return attr
+        state = self._devices.get(device_id)
+        if state:
+            for attr in state["attributes"]:
+                if attr["name"] == attr_name:
+                    return attr
         return None
 
     async def refresh_device(self, device_id: str):
@@ -244,23 +231,26 @@ class Hub:
         raise InvalidAttribute(f"Device {device_id} has no attribute {attr_name}")
 
     async def _load_info(self):
-        """Load general info about the hub."""
-        url = f"{self.host}/hub/edit"
+        """Load general info about the hub.
+
+        This requires this hub to authenticate with the Hubitat hub if its
+        security has been enabled.
+        """
+        url = f"{self.scheme}://{self.host}/hub/edit"
         _LOGGER.info("Getting hub info from %s...", url)
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.request("GET", url, timeout=timeout) as resp:
             if resp.status >= 400:
-                raise RequestError(resp)
-
-            text = await resp.text()
-            try:
-                soup = BeautifulSoup(text, "html.parser")
-                section = soup.find("h2", string="Hub Details")
-                self._info = _parse_details(section)
-                _LOGGER.debug("Loaded hub info: %s", self._info)
-            except Exception as e:
-                _LOGGER.error("Error parsing hub info: %s", e)
-                raise InvalidInfo()
+                _LOGGER.warning("Unable to access hub admin page: %s", resp.text)
+            else:
+                text = await resp.text()
+                try:
+                    soup = BeautifulSoup(text, "html.parser")
+                    section = soup.find("h2", string="Hub Details")
+                    self._info = _parse_details(section)
+                    _LOGGER.debug("Loaded hub info: %s", self._info)
+                except Exception as e:
+                    _LOGGER.error("Error parsing hub info: %s", e)
 
     async def _load_devices(self, force_refresh=False):
         """Load the current state of all devices."""
@@ -336,16 +326,11 @@ class Hub:
                 raise RequestError(resp)
             return json
 
-    def _ensure_started(self):
-        """Ensure this Hub has been started."""
-        if not self._started:
-            raise NotReady()
-
 
 _DETAILS_MAPPING = {
     "Hubitat Elevation® Platform Version": "sw_version",
     "Hardware Version": "hw_version",
-    "Hub UID": "id",
+    "Hub UID": "uid",
     "IP Address": "address",
     "MAC Address": "mac",
 }

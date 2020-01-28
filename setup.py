@@ -5,7 +5,7 @@ with open("README.md") as rm:
 
 setuptools.setup(
     name="hubitatmaker",
-    version="0.0.4",
+    version="0.0.5",
     author="Jason Cheatham",
     author_email="j.cheatham@gmail.com",
     description="A library for interfacing with Hubitat via its Maker API",
