@@ -38,7 +38,12 @@ class Hub:
     token: str
 
     def __init__(
-        self, host: str, app_id: str, access_token: str, self_serve: bool = False
+        self,
+        host: str,
+        app_id: str,
+        access_token: str,
+        port: int = None,
+        address: str = None,
     ):
         """Initialize a Hubitat hub interface.
 
@@ -50,10 +55,10 @@ class Hub:
           The ID of the Maker API instance this interface should use
         access_token:
           The access token for the Maker API instance
-        self_serve:
-          If true, start an HTTP server to listen for device events from the
-          hub. By default this class relies on the instantiating code to pass
-          it update events.
+        port:
+          The port to listen on for events (optional). Defaults to a random open port.
+        address:
+          The address to listen on for events (optional). Defaults to 0.0.0.0.
         """
         if not host or not app_id or not access_token:
             raise InvalidConfig()
@@ -65,13 +70,14 @@ class Hub:
         self.app_id = app_id
         self.token = access_token
         self.api_url = f"{self.scheme}://{self.host}/apps/api/{app_id}"
+        self.address = address or "0.0.0.0"
+        self.port = port or 0
 
         self._mac: Optional[str] = None
         self._started = False
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._info: Dict[str, str] = {}
         self._listeners: Dict[str, List[Listener]] = {}
-        self._self_serve = self_serve
 
         _LOGGER.info("Created hub %s", self)
 
@@ -146,9 +152,11 @@ class Hub:
         before this method has completed.
         """
         try:
-            if self._self_serve:
-                self._server = server.start_server(self.process_event, "10.0.1.100")
-                await self.set_event_url(self._server.url)
+            self._server = server.create_server(
+                self.process_event, self.address, self.port
+            )
+            self._server.start()
+            await self.set_event_url(self._server.url)
 
             await gather(self._load_info(), self._load_devices())
             self._started = True
@@ -159,7 +167,7 @@ class Hub:
     def stop(self) -> None:
         """Remove all listeners and stop the event server (if running)."""
         if self._server:
-            server.stop_server(self._server)
+            self._server.stop()
         self._listeners = {}
         self._started = False
 
