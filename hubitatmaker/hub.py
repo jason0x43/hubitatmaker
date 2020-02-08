@@ -69,7 +69,8 @@ class Hub:
         self.host = host_url.netloc or host_url.path
         self.app_id = app_id
         self.token = access_token
-        self.api_url = f"{self.scheme}://{self.host}/apps/api/{app_id}"
+        self.base_url = f"{self.scheme}://{self.host}"
+        self.api_url = f"{self.base_url}/apps/api/{app_id}"
         self.address = address or "0.0.0.0"
         self.port = port or 0
 
@@ -197,17 +198,22 @@ class Hub:
 
     async def set_event_url(self, event_url: str):
         """Set the URL that Hubitat will POST device events to."""
-        _LOGGER.info("Posting update to %s/postURL/%s", self.api_url, event_url)
+        _LOGGER.info("setting event update URL to %s", event_url)
         url = quote(str(event_url), safe="")
         await self._api_request(f"postURL/{url}")
 
     def process_event(self, event: Dict[str, Any]):
         """Process an event received from the hub."""
-        content = event["content"]
-        _LOGGER.debug(
-            "received event for for %(displayName)s (%(deviceId)s) - %(name)s -> %(value)s",
-            content,
-        )
+        try:
+            content = event["content"]
+            _LOGGER.debug(
+                "received event for for %(displayName)s (%(deviceId)s) - %(name)s -> %(value)s",
+                content,
+            )
+        except KeyError:
+            _LOGGER.warning("received invalid event: %s", event)
+            return
+
         device_id = content["deviceId"]
         self._update_device_attr(device_id, content["name"], content["value"])
         if device_id in self._listeners:
@@ -236,6 +242,9 @@ class Hub:
             if attr["name"] == attr_name:
                 attr["currentValue"] = value
                 return
+
+        # If we weren't able to set the attribute, this device doesn't
+        # understand that attribute
         raise InvalidAttribute(f"Device {device_id} has no attribute {attr_name}")
 
     async def _load_info(self):
@@ -244,8 +253,8 @@ class Hub:
         This requires this hub to authenticate with the Hubitat hub if its
         security has been enabled.
         """
-        url = f"{self.scheme}://{self.host}/hub/edit"
-        _LOGGER.info("Getting hub info from %s...", url)
+        url = f"{self.host_url}/hub/edit"
+        _LOGGER.info("Trying to get hub info from %s...", url)
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.request("GET", url, timeout=timeout) as resp:
             if resp.status >= 400:
@@ -258,7 +267,7 @@ class Hub:
                     self._info = _parse_details(section)
                     _LOGGER.debug("Loaded hub info: %s", self._info)
                 except Exception as e:
-                    _LOGGER.error("Error parsing hub info: %s", e)
+                    _LOGGER.warning("Error parsing hub info: %s", e)
 
     async def _load_devices(self, force_refresh=False):
         """Load the current state of all devices."""
@@ -271,43 +280,7 @@ class Hub:
                 await self._load_device(dev["id"], force_refresh)
 
     async def _load_device(self, device_id: str, force_refresh=False):
-        """Return full info for a specific device.
-
-        {
-            "id": "1922",
-            "name": "Generic Z-Wave Smart Dimmer",
-            "label": "Bedroom Light",
-            "attributes": [
-                {
-                    "dataType": "NUMBER",
-                    "currentValue": 10,
-                    "name": "level"
-                },
-                {
-                    "values": ["on", "off"],
-                    "name": "switch",
-                    "currentValue": "on",
-                    "dataType": "ENUM"
-                }
-            ],
-            "capabilities": [
-                "Switch",
-                {"attributes": [{"name": "switch", "currentValue": "off", "dataType": "ENUM", "values": ["on", "off"]}]},
-                "Configuration",
-                "SwitchLevel"
-                {"attributes": [{"name": "level", "dataType": null}]}
-            ],
-            "commands": [
-                "configure",
-                "flash",
-                "off",
-                "on",
-                "refresh",
-                "setLevel"
-            ]
-        ]
-        """
-
+        """Return full info for a specific device."""
         if force_refresh or device_id not in self._devices:
             _LOGGER.debug("Loading device %s", device_id)
             json = await self._api_request(f"devices/{device_id}")
