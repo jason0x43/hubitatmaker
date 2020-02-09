@@ -62,11 +62,11 @@ class Hub:
 
         self.scheme = host_url.scheme or "http"
         self.host = host_url.netloc or host_url.path
+        self.port = port
         self.app_id = app_id
         self.token = access_token
         self.base_url = f"{self.scheme}://{self.host}"
         self.api_url = f"{self.base_url}/apps/api/{app_id}"
-        self.port = port or 0
         self.mac = _get_mac_address(self.host)
 
         self._devices: Dict[str, Dict[str, Any]] = {}
@@ -82,16 +82,6 @@ class Hub:
     def devices(self) -> ValuesView[Dict[str, Any]]:
         """Return a list of devices managed by the Hubitat hub."""
         return self._devices.values()
-
-    @property
-    def id(self) -> str:
-        """Return the unique ID of the Hubitat hub."""
-        return f"{self.host}::{self.app_id}"
-
-    @property
-    def name(self) -> str:
-        """Return the device name for the Hubitat hub."""
-        return "Hubitat Elevation"
 
     def add_device_listener(self, device_id: str, listener: Listener):
         """Listen for updates for a particular device."""
@@ -140,9 +130,10 @@ class Hub:
     def stop(self) -> None:
         """Remove all listeners and stop the event server (if running)."""
         if self._server:
+            _LOGGER.debug("stopping event server")
             self._server.stop()
+            self._server = None
         self._listeners = {}
-        self._started = False
 
     def get_device_attribute(
         self, device_id: str, attr_name: str
@@ -219,7 +210,7 @@ class Hub:
         # understand that attribute
         raise InvalidAttribute(f"Device {device_id} has no attribute {attr_name}")
 
-    async def _load_devices(self, force_refresh=False):
+    async def _load_devices(self, force_refresh=False) -> None:
         """Load the current state of all devices."""
         if force_refresh or len(self._devices) == 0:
             devices = await self._api_request("devices")
@@ -229,7 +220,7 @@ class Hub:
             for dev in devices:
                 await self._load_device(dev["id"], force_refresh)
 
-    async def _load_device(self, device_id: str, force_refresh=False):
+    async def _load_device(self, device_id: str, force_refresh=False) -> None:
         """Return full info for a specific device."""
         if force_refresh or device_id not in self._devices:
             _LOGGER.debug("Loading device %s", device_id)
