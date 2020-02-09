@@ -72,6 +72,10 @@ class fake_request:
         pass
 
 
+def fake_get_mac_address(**kwargs: str):
+    return "aa:bb:cc:dd:ee:ff"
+
+
 class TestHub(TestCase):
     def setUp(self):
         requests = []
@@ -83,26 +87,16 @@ class TestHub(TestCase):
         self.assertRaises(InvalidConfig, Hub, "1.2.3.4", "1234", "")
         Hub("1.2.3.4", "1234", "token")
 
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     def test_connection_required(self) -> None:
         """Some property and method accesses return unknown without a connection."""
         hub = Hub("1.2.3.4", "1234", "token")
         self.assertEqual(list(hub.devices), [])
-        self.assertEqual(hub.hw_version, "unknown")
-        self.assertEqual(hub.mac, "unknown")
-        self.assertEqual(hub.sw_version, "unknown")
+        self.assertEqual(hub.mac, "aa:bb:cc:dd:ee:ff")
         hub.get_device_attribute("foo", "bar")
 
-    def test_hub_name(self) -> None:
-        """A hub should return its name."""
-        hub = Hub("1.2.3.4", "1234", "token")
-        self.assertEqual(hub.name, "Hubitat Elevation")
-
-    def test_hub_id(self) -> None:
-        """A hub should return its id."""
-        hub = Hub("1.2.3.4", "1234", "token")
-        self.assertEqual(hub.id, "1.2.3.4::1234")
-
     @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_start_server(self, MockServer):
         """Hub should start a server when asked to."""
@@ -111,16 +105,20 @@ class TestHub(TestCase):
         self.assertTrue(MockServer.called)
 
     @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_start(self, MockServer):
         """start() should request data from the Hubitat hub."""
         hub = Hub("1.2.3.4", "1234", "token")
         run(hub.start())
-        self.assertGreaterEqual(len(requests), 2)
-        self.assertRegex(requests[1]["url"], "/hub/edit$")
-        self.assertRegex(requests[2]["url"], "devices$")
+        # 33 requests - 1 to get device list, 32 to update devices
+        self.assertEqual(len(requests), 33)
+        self.assertRegex(requests[1]["url"], "devices$")
+        self.assertRegex(requests[2]["url"], "devices/\d+$")
+        self.assertRegex(requests[-1]["url"], "devices/\d+$")
 
     @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_stop_server(self, MockServer):
         """Hub should stop a server when stopped."""
@@ -131,15 +129,7 @@ class TestHub(TestCase):
         self.assertTrue(MockServer.return_value.stop.called)
 
     @patch("aiohttp.request", new=fake_request)
-    @patch("hubitatmaker.server.Server")
-    def test_info_parsed(self, MockServer):
-        """Started hub should have parsed Hubitat info."""
-        hub = Hub("1.2.3.4", "1234", "token")
-        run(hub.start())
-        self.assertEqual(hub.id, "1.2.3.4::1234")
-        self.assertEqual(hub.mac, "12:34:56:78:9A:BC")
-
-    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_devices_loaded(self, MockServer):
         """Started hub should have parsed device info."""
@@ -148,6 +138,7 @@ class TestHub(TestCase):
         self.assertEqual(len(hub.devices), 9)
 
     @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_event(self, MockServer):
         """Started hub should process a device event."""
