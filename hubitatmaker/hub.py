@@ -40,6 +40,7 @@ class Hub:
     token: str
 
     _server: server.Server
+    _conn: aiohttp.TCPConnector
 
     def __init__(self, host: str, app_id: str, access_token: str, port: int = None):
         """Initialize a Hubitat hub interface.
@@ -71,6 +72,7 @@ class Hub:
 
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._listeners: Dict[str, List[Listener]] = {}
+        self._conn = aiohttp.TCPConnector(verify_ssl=False)
 
         _LOGGER.info("Created hub %s", self)
 
@@ -263,7 +265,7 @@ class Hub:
         """Make a Maker API request."""
         params = {"access_token": self.token}
         async with aiohttp.request(
-            method, f"{self.api_url}/{path}", params=params
+            method, f"{self.api_url}/{path}", params=params, connector=self._conn
         ) as resp:
             if resp.status >= 400:
                 if resp.status == 401:
