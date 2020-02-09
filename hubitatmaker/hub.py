@@ -22,7 +22,7 @@ from .error import (
 
 _LOGGER = getLogger(__name__)
 
-Listener = Callable[[], None]
+Listener = Callable[[Dict[str, Any]], None]
 
 
 class Hub:
@@ -179,9 +179,16 @@ class Hub:
 
         device_id = content["deviceId"]
         self._update_device_attr(device_id, content["name"], content["value"])
+
+        event = {
+            "device_id": device_id,
+            "attribute": content["name"],
+            "value": content["value"],
+        }
+
         if device_id in self._listeners:
             for listener in self._listeners[device_id]:
-                listener()
+                listener(event)
 
     async def set_port(self, port: int) -> None:
         self.port = port
