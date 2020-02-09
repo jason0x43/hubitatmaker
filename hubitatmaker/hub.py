@@ -1,5 +1,4 @@
 """Hubitat API."""
-from asyncio import gather
 from functools import wraps
 from logging import getLogger
 import re
@@ -77,7 +76,6 @@ class Hub:
         self._mac: Optional[str] = None
         self._started = False
         self._devices: Dict[str, Dict[str, Any]] = {}
-        self._info: Dict[str, str] = {}
         self._listeners: Dict[str, List[Listener]] = {}
 
         _LOGGER.info("Created hub %s", self)
@@ -92,29 +90,14 @@ class Hub:
         return self._devices.values()
 
     @property
-    def hw_version(self) -> Optional[str]:
-        """Return the Hubitat hub's hardware version."""
-        return self._info.get("hw_version", "unknown")
-
-    @property
     def id(self) -> str:
         """Return the unique ID of the Hubitat hub."""
         return f"{self.host}::{self.app_id}"
 
     @property
-    def mac(self) -> str:
-        """Return the MAC address of the Hubitat hub."""
-        return self._info.get("mac", "unknown")
-
-    @property
     def name(self) -> str:
         """Return the device name for the Hubitat hub."""
         return "Hubitat Elevation"
-
-    @property
-    def sw_version(self) -> str:
-        """Return the Hubitat hub's software version."""
-        return self._info.get("sw_version", "unknown")
 
     def add_device_listener(self, device_id: str, listener: Listener):
         """Listen for updates for a particular device."""
@@ -141,7 +124,7 @@ class Hub:
         communicating with the hub.
         """
         try:
-            await gather(self._load_info(), self._check_api())
+            await self._check_api()
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
 
@@ -159,8 +142,8 @@ class Hub:
             self._server.start()
             await self.set_event_url(self._server.url)
 
-            await gather(self._load_info(), self._load_devices())
             self._started = True
+            await self._load_devices()
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
@@ -247,28 +230,6 @@ class Hub:
         # understand that attribute
         raise InvalidAttribute(f"Device {device_id} has no attribute {attr_name}")
 
-    async def _load_info(self):
-        """Load general info about the hub.
-
-        This requires this hub to authenticate with the Hubitat hub if its
-        security has been enabled.
-        """
-        url = f"{self.host_url}/hub/edit"
-        _LOGGER.info("Trying to get hub info from %s...", url)
-        timeout = aiohttp.ClientTimeout(total=10)
-        async with aiohttp.request("GET", url, timeout=timeout) as resp:
-            if resp.status >= 400:
-                _LOGGER.warning("Unable to access hub admin page: %s", resp.text)
-            else:
-                text = await resp.text()
-                try:
-                    soup = BeautifulSoup(text, "html.parser")
-                    section = soup.find("h2", string="Hub Details")
-                    self._info = _parse_details(section)
-                    _LOGGER.debug("Loaded hub info: %s", self._info)
-                except Exception as e:
-                    _LOGGER.warning("Error parsing hub info: %s", e)
-
     async def _load_devices(self, force_refresh=False):
         """Load the current state of all devices."""
         if force_refresh or len(self._devices) == 0:
@@ -308,23 +269,3 @@ class Hub:
             return json
 
 
-_DETAILS_MAPPING = {
-    "Hubitat Elevation® Platform Version": "sw_version",
-    "Hardware Version": "hw_version",
-    "Hub UID": "uid",
-    "IP Address": "address",
-    "MAC Address": "mac",
-}
-
-
-def _parse_details(tag):
-    """Parse hub details from HTML."""
-    details: Dict[str, str] = {}
-    group = tag.find_next_sibling("div")
-    while group is not None:
-        heading = group.find("div", class_="menu-header").text.strip()
-        content = group.find("div", class_="menu-text").text.strip()
-        if heading in _DETAILS_MAPPING:
-            details[_DETAILS_MAPPING[heading]] = content
-        group = group.find_next_sibling("div")
-    return details
