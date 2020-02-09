@@ -137,12 +137,23 @@ class Hub:
     def get_device_attribute(
         self, device_id: str, attr_name: str
     ) -> Optional[Dict[str, Any]]:
-        """Get an attribute value for a specific device."""
+        """Get an attribute for a specific device."""
         state = self._devices.get(device_id)
         if state:
             for attr in state["attributes"]:
                 if attr["name"] == attr_name:
                     return attr
+        return None
+
+    def get_device_attribute_value(
+        self, device_id: str, attr_name: str
+    ) -> Optional[Any]:
+        """Get an attribute value for a specific device."""
+        state = self._devices.get(device_id)
+        if state:
+            for attr in state["attributes"]:
+                if attr["name"] == attr_name:
+                    return attr["currentValue"]
         return None
 
     async def refresh_device(self, device_id: str):
