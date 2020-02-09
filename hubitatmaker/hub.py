@@ -1,4 +1,6 @@
 """Hubitat API."""
+import socket
+from contextlib import contextmanager
 from functools import wraps
 from logging import getLogger
 import re
@@ -36,14 +38,9 @@ class Hub:
     scheme: str
     token: str
 
-    def __init__(
-        self,
-        host: str,
-        app_id: str,
-        access_token: str,
-        port: int = None,
-        address: str = None,
-    ):
+    _server: server.Server
+
+    def __init__(self, host: str, app_id: str, access_token: str, port: int = None):
         """Initialize a Hubitat hub interface.
 
         host:
@@ -56,8 +53,6 @@ class Hub:
           The access token for the Maker API instance
         port:
           The port to listen on for events (optional). Defaults to a random open port.
-        address:
-          The address to listen on for events (optional). Defaults to 0.0.0.0.
         """
         if not host or not app_id or not access_token:
             raise InvalidConfig()
@@ -70,11 +65,9 @@ class Hub:
         self.token = access_token
         self.base_url = f"{self.scheme}://{self.host}"
         self.api_url = f"{self.base_url}/apps/api/{app_id}"
-        self.address = address or "0.0.0.0"
         self.port = port or 0
 
         self._mac: Optional[str] = None
-        self._started = False
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._listeners: Dict[str, List[Listener]] = {}
 
@@ -135,14 +128,9 @@ class Hub:
         completed. Methods that rely on that data will raise an error if called
         before this method has completed.
         """
-        try:
-            self._server = server.create_server(
-                self.process_event, self.address, self.port
-            )
-            self._server.start()
-            await self.set_event_url(self._server.url)
 
-            self._started = True
+        try:
+            await self._start_server()
             await self._load_devices()
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
@@ -268,4 +256,27 @@ class Hub:
                 raise RequestError(resp)
             return json
 
+    async def _start_server(self) -> None:
+        """Start an event listener server."""
+        # First, figure out what address to listen on. Open a connection to
+        # the Hubitat hub and see what address it used. This assumes this
+        # machine and the Hubitat hub are on the same network.
+        with _open_socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect((self.host, 80))
+            address = s.getsockname()[0]
 
+        self._server = server.create_server(self.process_event, address, self.port or 0)
+        self._server.start()
+        _LOGGER.debug("listening on %s:%d", address, self._server.port)
+
+        await self.set_event_url(self._server.url)
+
+
+@contextmanager
+def _open_socket(*args: Any, **kwargs: Any):
+    """Open a socket as a context manager."""
+    s = socket.socket(*args, **kwargs)
+    try:
+        yield s
+    finally:
+        s.close()
