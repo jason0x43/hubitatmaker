@@ -132,7 +132,6 @@ class Hub:
         if self._server:
             _LOGGER.debug("stopping event server")
             self._server.stop()
-            self._server = None
         self._listeners = {}
 
     def get_device_attribute(
@@ -191,6 +190,10 @@ class Hub:
                 listener(event)
 
     async def set_port(self, port: int) -> None:
+        """Set the port that the event listener server will listen on.
+
+        Setting this will stop and restart the event listener server.
+        """
         self.port = port
         if self._server:
             self._server.stop()
