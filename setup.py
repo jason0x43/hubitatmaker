@@ -19,7 +19,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    install_requires=["aiohttp>=3", "beautifulsoup4>=4"],
+    install_requires=["aiohttp>=3", "beautifulsoup4>=4", "getmac==0.8.2"],
     python_requires=">=3.6",
     package_data={"hubitatmaker": ["py.typed"]},
 )

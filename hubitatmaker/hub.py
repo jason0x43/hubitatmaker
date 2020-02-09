@@ -1,13 +1,14 @@
 """Hubitat API."""
+import re
 import socket
 from contextlib import contextmanager
 from functools import wraps
 from logging import getLogger
-import re
 from typing import Any, Callable, Dict, List, Optional, Union, ValuesView, cast
 from urllib.parse import quote, urlparse
 
 import aiohttp
+import getmac
 from bs4 import BeautifulSoup
 
 from . import server
@@ -66,8 +67,8 @@ class Hub:
         self.base_url = f"{self.scheme}://{self.host}"
         self.api_url = f"{self.base_url}/apps/api/{app_id}"
         self.port = port or 0
+        self.mac = _get_mac_address(self.host)
 
-        self._mac: Optional[str] = None
         self._devices: Dict[str, Dict[str, Any]] = {}
         self._listeners: Dict[str, List[Listener]] = {}
 
@@ -280,3 +281,10 @@ def _open_socket(*args: Any, **kwargs: Any):
         yield s
     finally:
         s.close()
+
+
+def _get_mac_address(host: str) -> str:
+    """Return the mac address of a remote host."""
+    if re.match("\d+\.\d+\.\d+\.\d+", host):
+        return getmac.get_mac_address(ip=host)
+    return getmac.get_mac_address(hostname=host)
