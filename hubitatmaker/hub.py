@@ -183,6 +183,12 @@ class Hub:
             for listener in self._listeners[device_id]:
                 listener()
 
+    async def set_port(self, port: int) -> None:
+        self.port = port
+        if self._server:
+            self._server.stop()
+        await self._start_server()
+
     async def _check_api(self):
         """Check for api access.
 
