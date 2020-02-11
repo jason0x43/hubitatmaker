@@ -20,9 +20,12 @@ from .error import (
     RequestError,
 )
 
-_LOGGER = getLogger(__name__)
+Event = Dict[str, Any]
+Device = Dict[str, Any]
+Listener = Callable[[Event], None]
 
-Listener = Callable[[Dict[str, Any]], None]
+
+_LOGGER = getLogger(__name__)
 
 
 class Hub:
@@ -70,7 +73,7 @@ class Hub:
         self.api_url = f"{self.base_url}/apps/api/{app_id}"
         self.mac = _get_mac_address(self.host)
 
-        self._devices: Dict[str, Dict[str, Any]] = {}
+        self._devices: Dict[str, Device] = {}
         self._listeners: Dict[str, List[Listener]] = {}
         self._conn = aiohttp.TCPConnector(verify_ssl=False)
 
@@ -81,7 +84,7 @@ class Hub:
         return f"<Hub host={self.host} app_id={self.app_id}>"
 
     @property
-    def devices(self) -> ValuesView[Dict[str, Any]]:
+    def devices(self) -> ValuesView[Device]:
         """Return a list of devices managed by the Hubitat hub."""
         return self._devices.values()
 
@@ -177,7 +180,7 @@ class Hub:
         url = quote(str(event_url), safe="")
         await self._api_request(f"postURL/{url}")
 
-    def process_event(self, event: Dict[str, Any]):
+    def process_event(self, event: Dict[str, Any]) -> None:
         """Process an event received from the hub."""
         try:
             content = event["content"]
@@ -192,7 +195,7 @@ class Hub:
         device_id = content["deviceId"]
         self._update_device_attr(device_id, content["name"], content["value"])
 
-        event = {
+        evt = {
             "device_id": device_id,
             "attribute": content["name"],
             "value": content["value"],
@@ -200,7 +203,7 @@ class Hub:
 
         if device_id in self._listeners:
             for listener in self._listeners[device_id]:
-                listener(event)
+                listener(evt)
 
     async def set_port(self, port: int) -> None:
         """Set the port that the event listener server will listen on.
