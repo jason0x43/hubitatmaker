@@ -106,6 +106,11 @@ class Hub:
                 return True
         return False
 
+    def device_has_capability(self, device_id: str, cap_name: str):
+        """Return True if the given device has the given capability."""
+        state = self._devices[device_id]
+        return cap_name in state["capabilities"]
+
     async def check_config(self) -> None:
         """Verify that the hub is accessible.
 
@@ -140,8 +145,8 @@ class Hub:
     def stop(self) -> None:
         """Remove all listeners and stop the event server (if running)."""
         if self._server:
-            _LOGGER.debug("stopping event server")
             self._server.stop()
+            _LOGGER.info("Stopped event server")
         self._listeners = {}
 
     def get_device_attribute(
@@ -181,7 +186,7 @@ class Hub:
 
     async def set_event_url(self, event_url: str):
         """Set the URL that Hubitat will POST device events to."""
-        _LOGGER.info("setting event update URL to %s", event_url)
+        _LOGGER.info("Setting event update URL to %s", event_url)
         url = quote(str(event_url), safe="")
         await self._api_request(f"postURL/{url}")
 
@@ -190,11 +195,11 @@ class Hub:
         try:
             content = event["content"]
             _LOGGER.debug(
-                "received event for for %(displayName)s (%(deviceId)s) - %(name)s -> %(value)s",
+                "Received event for for %(displayName)s (%(deviceId)s) - %(name)s -> %(value)s",
                 content,
             )
         except KeyError:
-            _LOGGER.warning("received invalid event: %s", event)
+            _LOGGER.warning("Received invalid event: %s", event)
             return
 
         device_id = content["deviceId"]
@@ -296,7 +301,7 @@ class Hub:
 
         self._server = server.create_server(self.process_event, address, self.port or 0)
         self._server.start()
-        _LOGGER.debug("listening on %s:%d", address, self._server.port)
+        _LOGGER.debug("Listening on %s:%d", address, self._server.port)
 
         await self.set_event_url(self._server.url)
 
