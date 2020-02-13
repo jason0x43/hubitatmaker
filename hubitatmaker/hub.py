@@ -43,7 +43,7 @@ class Hub:
     token: str
 
     _server: server.Server
-    _conn: aiohttp.TCPConnector
+    _conn: Optional[aiohttp.TCPConnector]
 
     def __init__(self, host: str, app_id: str, access_token: str, port: int = None):
         """Initialize a Hubitat hub interface.
@@ -75,7 +75,7 @@ class Hub:
 
         self._devices: Dict[str, Device] = {}
         self._listeners: Dict[str, List[Listener]] = {}
-        self._conn = aiohttp.TCPConnector(verify_ssl=False)
+        self._conn = None
 
         _LOGGER.info("Created hub %s", self)
 
@@ -112,6 +112,9 @@ class Hub:
         This method will raise a ConnectionError if there was a problem
         communicating with the hub.
         """
+        if self._conn is None:
+            self._conn = aiohttp.TCPConnector(ssl=False)
+
         try:
             await self._check_api()
         except aiohttp.ClientError as e:
@@ -124,6 +127,8 @@ class Hub:
         completed. Methods that rely on that data will raise an error if called
         before this method has completed.
         """
+        if self._conn is None:
+            self._conn = aiohttp.TCPConnector(ssl=False)
 
         try:
             await self._start_server()
