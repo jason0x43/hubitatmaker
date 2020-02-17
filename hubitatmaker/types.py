@@ -58,10 +58,12 @@ class Device:
 
         self._attributes: Dict[str, Attribute] = {}
         self._attributes_ro = MappingProxyType(self._attributes)
-        for attr in properties["attributes"]:
+        for attr in properties.get("attributes", []):
             self._attributes[attr["name"]] = Attribute(attr)
 
-        caps: List[str] = [p for p in properties["capabilities"] if isinstance(p, str)]
+        caps: List[str] = [
+            p for p in properties.get("capabilities", []) if isinstance(p, str)
+        ]
         self._capabilities: Tuple[str, ...] = tuple(caps)
 
     def __iter__(self):
