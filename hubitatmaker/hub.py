@@ -4,7 +4,8 @@ import socket
 from contextlib import contextmanager
 from functools import wraps
 from logging import getLogger
-from typing import Any, Callable, Dict, List, Optional, Union, ValuesView, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Union, ValuesView, cast
+from types import MappingProxyType
 from urllib.parse import quote, urlparse
 
 import aiohttp
@@ -19,9 +20,8 @@ from .error import (
     InvalidToken,
     RequestError,
 )
+from .types import Device, Event
 
-Event = Dict[str, Any]
-Device = Dict[str, Any]
 Listener = Callable[[Event], None]
 
 
@@ -84,9 +84,9 @@ class Hub:
         return f"<Hub host={self.host} app_id={self.app_id}>"
 
     @property
-    def devices(self) -> ValuesView[Device]:
+    def devices(self) -> Mapping[str, Device]:
         """Return a list of devices managed by the Hubitat hub."""
-        return self._devices.values()
+        return MappingProxyType(self._devices)
 
     def add_device_listener(self, device_id: str, listener: Listener):
         """Listen for updates for a particular device."""
@@ -97,19 +97,6 @@ class Hub:
     def remove_device_listeners(self, device_id: str):
         """Remove all listeners for a particular device."""
         self._listeners[device_id] = []
-
-    def device_has_attribute(self, device_id: str, attr_name: str):
-        """Return True if the given device has the given attribute."""
-        state = self._devices[device_id]
-        for attr in state["attributes"]:
-            if attr["name"] == attr_name:
-                return True
-        return False
-
-    def device_has_capability(self, device_id: str, cap_name: str):
-        """Return True if the given device has the given capability."""
-        state = self._devices[device_id]
-        return cap_name in state["capabilities"]
 
     async def check_config(self) -> None:
         """Verify that the hub is accessible.
@@ -149,28 +136,6 @@ class Hub:
             _LOGGER.info("Stopped event server")
         self._listeners = {}
 
-    def get_device_attribute(
-        self, device_id: str, attr_name: str
-    ) -> Optional[Dict[str, Any]]:
-        """Get an attribute for a specific device."""
-        state = self._devices.get(device_id)
-        if state:
-            for attr in state["attributes"]:
-                if attr["name"] == attr_name:
-                    return attr
-        return None
-
-    def get_device_attribute_value(
-        self, device_id: str, attr_name: str
-    ) -> Optional[Any]:
-        """Get an attribute value for a specific device."""
-        state = self._devices.get(device_id)
-        if state:
-            for attr in state["attributes"]:
-                if attr["name"] == attr_name:
-                    return attr["currentValue"]
-        return None
-
     async def refresh_device(self, device_id: str):
         """Refresh a device's state."""
         await self._load_device(device_id, force_refresh=True)
@@ -194,10 +159,7 @@ class Hub:
         """Process an event received from the hub."""
         try:
             content = event["content"]
-            _LOGGER.debug(
-                "Received event for for %(displayName)s (%(deviceId)s) - %(name)s -> %(value)s",
-                content,
-            )
+            _LOGGER.debug("Received event: %s", content)
         except KeyError:
             _LOGGER.warning("Received invalid event: %s", event)
             return
@@ -205,11 +167,7 @@ class Hub:
         device_id = content["deviceId"]
         self._update_device_attr(device_id, content["name"], content["value"])
 
-        evt = {
-            "device_id": device_id,
-            "attribute": content["name"],
-            "value": content["value"],
-        }
+        evt = Event(content)
 
         if device_id in self._listeners:
             for listener in self._listeners[device_id]:
@@ -238,19 +196,18 @@ class Hub:
         """Update a device attribute value."""
         _LOGGER.debug("Updating %s of %s to %s", attr_name, device_id, value)
         try:
-            state = self._devices[device_id]
+            dev = self._devices[device_id]
         except KeyError:
             _LOGGER.warning("Tried to update unknown device %s", device_id)
             return
 
-        for attr in state["attributes"]:
-            if attr["name"] == attr_name:
-                attr["currentValue"] = value
-                return
+        try:
+            attr = dev.attributes[attr_name]
+        except KeyError:
+            _LOGGER.warning("Tried to update unknown attribute %s", attr_name)
+            return
 
-        # If we weren't able to set the attribute, this device doesn't
-        # understand that attribute
-        raise InvalidAttribute(f"Device {device_id} has no attribute {attr_name}")
+        attr.update_value(value)
 
     async def _load_devices(self, force_refresh=False) -> None:
         """Load the current state of all devices."""
@@ -268,7 +225,10 @@ class Hub:
             _LOGGER.debug("Loading device %s", device_id)
             json = await self._api_request(f"devices/{device_id}")
             try:
-                self._devices[device_id] = json
+                if device_id in self._devices:
+                    self._devices[device_id].update_state(json)
+                else:
+                    self._devices[device_id] = Device(json)
             except Exception as e:
                 _LOGGER.error("Invalid device info: %s", json)
                 raise e
