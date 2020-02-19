@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Mapping, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from types import MappingProxyType
 
 
@@ -83,6 +83,14 @@ class Event:
         return self._properties["deviceId"]
 
     @property
+    def device_name(self) -> Optional[str]:
+        return self._properties.get("displayName")
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._properties.get("descriptionText")
+
+    @property
     def attribute(self) -> str:
         return self._properties["name"]
 
@@ -91,8 +99,8 @@ class Event:
         return self._properties["value"]
 
     def __iter__(self):
-        for key in "device_id", "attribute", "value":
+        for key in "device_id", "device_name", "attribute", "value", "description":
             yield key, getattr(self, key)
 
     def __str__(self) -> str:
-        return f"<Event device_id={self.device_id} attribute={self.attribute} value={self.value}>"
+        return f'<Event device_id="{self.device_id}" device_name="{self.device_name}" attribute="{self.attribute}" value="{self.value}" description="{self.description}">'
