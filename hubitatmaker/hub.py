@@ -10,7 +10,6 @@ from urllib.parse import quote, urlparse
 
 import aiohttp
 import getmac
-from bs4 import BeautifulSoup
 
 from . import server
 from .error import (

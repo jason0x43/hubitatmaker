@@ -5,7 +5,7 @@ with open("README.md") as rm:
 
 setuptools.setup(
     name="hubitatmaker",
-    version="0.2.2",
+    version="0.2.3",
     author="Jason Cheatham",
     author_email="j.cheatham@gmail.com",
     description="A library for interfacing with Hubitat via its Maker API",
@@ -19,7 +19,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    install_requires=["aiohttp>=3", "beautifulsoup4>=4", "getmac==0.8.2"],
+    install_requires=["aiohttp>=3", "getmac==0.8.2"],
     python_requires=">=3.6",
     package_data={"hubitatmaker": ["py.typed"]},
 )
