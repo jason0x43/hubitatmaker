@@ -97,4 +97,4 @@ STATE_UNKNOWN = "unknown"
 STATE_UNLOCKED = "unlocked"
 STATE_UNLOCKED_WITH_TIMEOUT = "unlocked with timeout"
 
-DEFAULT_SPEEDS = ["low", "medium-low", "medium", "medium-high", "high", "on", "off", "auto"]
+DEFAULT_FAN_SPEEDS = ["low", "medium-low", "medium", "medium-high", "high", "on", "off", "auto"]
