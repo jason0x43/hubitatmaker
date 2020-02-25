@@ -49,6 +49,7 @@ ATTR_SMOKE = "smoke"
 ATTR_TEMPERATURE = "temperature"
 ATTR_UV = "ultravioletIndex"
 ATTR_VALUE = "value"
+ATTR_VALUES = "values"
 ATTR_VOLTAGE = "voltage"
 ATTR_WATER = "water"
 ATTR_WINDOW_SHADE = "windowShade"
@@ -96,3 +97,5 @@ STATE_OPENING = "opening"
 STATE_UNKNOWN = "unknown"
 STATE_UNLOCKED = "unlocked"
 STATE_UNLOCKED_WITH_TIMEOUT = "unlocked with timeout"
+
+DEFAULT_SPEEDS = ["low", "medium-low", "medium", "medium-high", "high", "on", "off", "auto"]

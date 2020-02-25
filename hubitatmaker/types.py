@@ -18,6 +18,12 @@ class Attribute:
     def value(self) -> Union[str, float]:
         return self._properties["currentValue"]
 
+    @property
+    def values(self) -> Optional[Tuple[str, ...]]:
+        if "values" not in self._properties:
+            return None
+        return tuple(self._properties["values"])
+
     def update_value(self, value: Union[str, float]) -> None:
         self._properties["currentValue"] = value
 
