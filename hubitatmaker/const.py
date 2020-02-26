@@ -53,6 +53,7 @@ ATTR_VOLTAGE = "voltage"
 ATTR_WATER = "water"
 ATTR_WINDOW_SHADE = "windowShade"
 ATTR_SPEED = "speed"
+ATTR_SWITCH = "switch"
 
 CMD_AUTO = "auto"
 CMD_AWAY = "away"
