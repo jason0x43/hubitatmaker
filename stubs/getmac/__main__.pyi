@@ -1,3 +1,0 @@
-from . import getmac as getmac
-
-def main() -> None: ...
