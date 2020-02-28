@@ -1,4 +1,4 @@
-from aiohttp import ClientError, ClientResponse, ClientTimeout, request
+from aiohttp import ClientResponse
 
 
 class ConnectionError(Exception):
@@ -11,14 +11,6 @@ class InvalidToken(Exception):
 
 class InvalidConfig(Exception):
     """Error indicating invalid hub config data."""
-
-
-class InvalidAttribute(Exception):
-    """Error indicating an invalid device attribute."""
-
-
-class InvalidInfo(Exception):
-    """Error indicating that the hub returned invalid general info."""
 
 
 class RequestError(Exception):

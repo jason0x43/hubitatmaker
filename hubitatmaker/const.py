@@ -92,10 +92,22 @@ CMD_CYCLE_SPEED = "cycleSpeed"
 STATE_CLOSED = "closed"
 STATE_CLOSING = "closing"
 STATE_LOCKED = "locked"
+STATE_LOW = "low"
+STATE_OFF = "off"
+STATE_ON = "on"
 STATE_OPEN = "open"
 STATE_OPENING = "opening"
 STATE_UNKNOWN = "unknown"
 STATE_UNLOCKED = "unlocked"
 STATE_UNLOCKED_WITH_TIMEOUT = "unlocked with timeout"
 
-DEFAULT_FAN_SPEEDS = ["low", "medium-low", "medium", "medium-high", "high", "on", "off", "auto"]
+DEFAULT_FAN_SPEEDS = [
+    "low",
+    "medium-low",
+    "medium",
+    "medium-high",
+    "high",
+    "on",
+    "off",
+    "auto",
+]

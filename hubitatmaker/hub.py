@@ -1,24 +1,17 @@
 """Hubitat API."""
+from contextlib import contextmanager
+from logging import getLogger
 import re
 import socket
-from contextlib import contextmanager
-from functools import wraps
-from logging import getLogger
-from typing import Any, Callable, Dict, List, Mapping, Optional, Union, ValuesView, cast
 from types import MappingProxyType
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Union
 from urllib.parse import quote, urlparse
 
 import aiohttp
 import getmac
 
 from . import server
-from .error import (
-    InvalidAttribute,
-    InvalidConfig,
-    InvalidInfo,
-    InvalidToken,
-    RequestError,
-)
+from .error import InvalidConfig, InvalidToken, RequestError
 from .types import Device, Event
 
 Listener = Callable[[Event], None]
@@ -30,9 +23,8 @@ _LOGGER = getLogger(__name__)
 class Hub:
     """A representation of a Hubitat hub.
 
-    This class downloads initial device data from a Hubitat hub and waits for the 
-    hub to push it state updates for devices. This means that the class must be
-    able to receive update events. There are two ways to handle this: by relying on external code to pass in update events via this class's 
+    This class downloads initial device data from a Hubitat hub and waits for
+    the hub to push it state updates for devices.
     """
 
     api_url: str
@@ -87,13 +79,13 @@ class Hub:
         """Return a list of devices managed by the Hubitat hub."""
         return MappingProxyType(self._devices)
 
-    def add_device_listener(self, device_id: str, listener: Listener):
+    def add_device_listener(self, device_id: str, listener: Listener) -> None:
         """Listen for updates for a particular device."""
         if device_id not in self._listeners:
             self._listeners[device_id] = []
         self._listeners[device_id].append(listener)
 
-    def remove_device_listeners(self, device_id: str):
+    def remove_device_listeners(self, device_id: str) -> None:
         """Remove all listeners for a particular device."""
         self._listeners[device_id] = []
 
@@ -135,20 +127,20 @@ class Hub:
             _LOGGER.info("Stopped event server")
         self._listeners = {}
 
-    async def refresh_device(self, device_id: str):
+    async def refresh_device(self, device_id: str) -> None:
         """Refresh a device's state."""
         await self._load_device(device_id, force_refresh=True)
 
     async def send_command(
         self, device_id: str, command: str, arg: Optional[Union[str, int]]
-    ):
+    ) -> Dict[str, Any]:
         """Send a device command to the hub."""
         path = f"devices/{device_id}/{command}"
         if arg:
             path += f"/{arg}"
         return await self._api_request(path)
 
-    async def set_event_url(self, event_url: str):
+    async def set_event_url(self, event_url: str) -> None:
         """Set the URL that Hubitat will POST device events to."""
         _LOGGER.info("Setting event update URL to %s", event_url)
         url = quote(str(event_url), safe="")
@@ -182,7 +174,7 @@ class Hub:
             self._server.stop()
         await self._start_server()
 
-    async def _check_api(self):
+    async def _check_api(self) -> None:
         """Check for api access.
 
         An error will be raised if a test API request fails.
@@ -191,7 +183,7 @@ class Hub:
 
     def _update_device_attr(
         self, device_id: str, attr_name: str, value: Union[int, str]
-    ):
+    ) -> None:
         """Update a device attribute value."""
         _LOGGER.debug("Updating %s of %s to %s", attr_name, device_id, value)
         try:
@@ -211,7 +203,7 @@ class Hub:
     async def _load_devices(self, force_refresh=False) -> None:
         """Load the current state of all devices."""
         if force_refresh or len(self._devices) == 0:
-            devices = await self._api_request("devices")
+            devices: List[Dict[str, Any]] = await self._api_request("devices")
             _LOGGER.debug("Loaded device list")
 
             # load devices sequentially to avoid overloading the hub
@@ -233,7 +225,7 @@ class Hub:
                 raise e
             _LOGGER.debug("Loaded device %s", device_id)
 
-    async def _api_request(self, path: str, method="GET"):
+    async def _api_request(self, path: str, method="GET") -> Any:
         """Make a Maker API request."""
         params = {"access_token": self.token}
         async with aiohttp.request(
@@ -266,7 +258,7 @@ class Hub:
 
 
 @contextmanager
-def _open_socket(*args: Any, **kwargs: Any):
+def _open_socket(*args: Any, **kwargs: Any) -> Iterator[socket.socket]:
     """Open a socket as a context manager."""
     s = socket.socket(*args, **kwargs)
     try:
@@ -275,8 +267,8 @@ def _open_socket(*args: Any, **kwargs: Any):
         s.close()
 
 
-def _get_mac_address(host: str) -> str:
+def _get_mac_address(host: str) -> Optional[str]:
     """Return the mac address of a remote host."""
-    if re.match("\d+\.\d+\.\d+\.\d+", host):
+    if re.match("\\d+\\.\\d+\\.\\d+\\.\\d+", host):
         return getmac.get_mac_address(ip=host)
     return getmac.get_mac_address(hostname=host)
