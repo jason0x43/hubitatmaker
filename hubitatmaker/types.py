@@ -19,7 +19,7 @@ class Attribute:
         return self._properties["currentValue"]
 
     @property
-    def values(self) -> Optional[List[str, ...]]:
+    def values(self) -> Optional[List[str]]:
         if "values" not in self._properties:
             return None
         return self._properties["values"]
