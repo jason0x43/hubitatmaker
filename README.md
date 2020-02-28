@@ -26,3 +26,15 @@ if __name__ == '__main__':
 	token = '<apitoken>'
 	asyncio.run(print_devices(host, app_id, token))
 ```
+
+## Developing
+
+To get setup for development:
+
+1. `pip install pipenv`
+2. `pipenv install --dev`
+3. `pipenv run pre-commit install`
+
+This will setup the tools needed to validate typings and code style. Validators
+will be automatically run for every commit, and they can be run manually with
+pipenv (e.g., `pipenv run black hubitatmaker`).
