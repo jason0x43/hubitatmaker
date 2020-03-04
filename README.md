@@ -29,12 +29,14 @@ if __name__ == '__main__':
 
 ## Developing
 
-To get setup for development:
+To get setup for development, run
 
-1. `pip install pipenv`
-2. `pipenv install --dev`
-3. `pipenv run pre-commit install`
+```
+$ ./dev init
+```
 
-This will setup the tools needed to validate typings and code style. Validators
-will be automatically run for every commit, and they can be run manually with
-pipenv (e.g., `pipenv run black hubitatmaker`).
+To test the code, which will type check it and run unit tests, run
+
+```
+$ ./dev test
+```
