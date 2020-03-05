@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from types import MappingProxyType
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 
 class Attribute:
@@ -56,8 +56,12 @@ class Device:
         return self._attributes_ro
 
     @property
-    def capabilities(self) -> Tuple[str, ...]:
+    def capabilities(self) -> Sequence[str]:
         return self._capabilities
+
+    @property
+    def commands(self) -> Sequence[str]:
+        return self._commands
 
     def update_state(self, properties: Dict[str, Any]):
         self._properties = properties
@@ -71,6 +75,11 @@ class Device:
             p for p in properties.get("capabilities", []) if isinstance(p, str)
         ]
         self._capabilities: Tuple[str, ...] = tuple(caps)
+
+        commands: List[str] = [
+            p for p in properties.get("commands", []) if isinstance(p, str)
+        ]
+        self._commands: Tuple[str, ...] = tuple(commands)
 
     def __iter__(self):
         for key in "id", "name", "type", "attributes", "capabilities":
