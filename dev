@@ -14,9 +14,13 @@ case $op in
 		pipenv run pre-commit install
 		;;
 	
+	clean)
+		rm -rf build dist hubitatmaker.egg-info
+		;;
+
 	publish)
 		latest_tag=$(git describe --tags --abbrev=0)
-		package_version=v$(python -c "import pkg_resources; print(pkg_resources.get_distribution('hubitatmaker').version)")
+		package_version=v$(grep __version__ hubitatmaker/__init__.py | awk '{ print substr($3, 2, length($3)-2) }')
 		if [[ $latest_tag == $package_version ]]; then
 			echo "Update the package version before publishing"
 			exit 1

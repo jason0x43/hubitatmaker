@@ -1,4 +1,5 @@
 from .hub import Hub
-from .const import *
-from .error import *
-from .types import *
+
+__all__ = ["const", "error", "types", "Hub"]
+
+__version__ = "0.3.3"

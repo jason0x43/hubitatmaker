@@ -3,9 +3,14 @@ import setuptools
 with open("README.md") as rm:
     long_description = rm.read()
 
+with open("hubitatmaker/__init__.py") as init:
+    for line in init:
+        if line.startswith("__version__"):
+            version = line.split("=")[1].strip().strip('"')
+
 setuptools.setup(
     name="hubitatmaker",
-    version="0.3.3",
+    version=version,
     author="Jason Cheatham",
     author_email="j.cheatham@gmail.com",
     description="A library for interfacing with Hubitat via its Maker API",
