@@ -23,7 +23,14 @@ case $op in
 		fi
 		rm -rf build dist
 		pipenv run python setup.py sdist bdist_wheel
-		twine upload dist/*
+
+		echo "About to upload version $package_version from dist. If everything looks good, answer 'y': "
+		read answer
+		if [[ $answer != 'y' ]]; then
+			exit 0
+		fi
+
+		pipenv run twine upload dist/*
 		git tag $package_version
 		git push --tags
 		;;
