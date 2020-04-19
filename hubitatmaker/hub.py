@@ -138,6 +138,7 @@ class Hub:
         path = f"devices/{device_id}/{command}"
         if arg:
             path += f"/{arg}"
+        _LOGGER.debug("Sending command %s(%s) to %s", command, arg, device_id)
         return await self._api_request(path)
 
     async def set_event_url(self, event_url: str) -> None:
