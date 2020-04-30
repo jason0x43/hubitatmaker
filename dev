@@ -15,7 +15,7 @@ case $op in
 		;;
 	
 	clean)
-		rm -rf build dist hubitatmaker.egg-info
+		rm -rf build dist hubitatmaker.egg-info __pycache__
 		;;
 
 	publish)
