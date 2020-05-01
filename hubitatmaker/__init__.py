@@ -3,4 +3,4 @@ from .error import ConnectionError, InvalidConfig, InvalidToken, RequestError  #
 from .hub import Hub  # noqa
 from .types import Attribute, Device, Event  # noqa
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
