@@ -110,12 +110,23 @@ class Event:
         return self._properties["name"]
 
     @property
+    def type(self) -> Optional[str]:
+        return self._properties["type"]
+
+    @property
     def value(self) -> Union[str, float]:
         return self._properties["value"]
 
     def __iter__(self):
-        for key in "device_id", "device_name", "attribute", "value", "description":
+        for key in (
+            "device_id",
+            "device_name",
+            "attribute",
+            "value",
+            "description",
+            "type",
+        ):
             yield key, getattr(self, key)
 
     def __str__(self) -> str:
-        return f'<Event device_id="{self.device_id}" device_name="{self.device_name}" attribute="{self.attribute}" value="{self.value}" description="{self.description}">'
+        return f'<Event device_id="{self.device_id}" device_name="{self.device_name}" attribute="{self.attribute}" value="{self.value}" description="{self.description}" type="{self.type}">'
