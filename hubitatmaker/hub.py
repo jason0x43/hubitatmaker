@@ -32,6 +32,7 @@ class Hub:
     host: str
     scheme: str
     token: str
+    mac: str
 
     _server: server.Server
     _conn: Optional[aiohttp.TCPConnector]
@@ -53,16 +54,12 @@ class Hub:
         if not host or not app_id or not access_token:
             raise InvalidConfig()
 
-        host_url = urlparse(host)
-
-        self.scheme = host_url.scheme or "http"
-        self.host = host_url.netloc or host_url.path
         self.port = port
         self.app_id = app_id
         self.token = access_token
-        self.base_url = f"{self.scheme}://{self.host}"
-        self.api_url = f"{self.base_url}/apps/api/{app_id}"
-        self.mac = _get_mac_address(self.host)
+        self.mac = ""
+
+        self.set_host(host)
 
         self._devices: Dict[str, Device] = {}
         self._listeners: Dict[str, List[Listener]] = {}
@@ -164,6 +161,19 @@ class Hub:
         if device_id in self._listeners:
             for listener in self._listeners[device_id]:
                 listener(evt)
+
+    def set_host(self, host: str) -> None:
+        """Set the host address that the hub is accessible at."""
+        host_url = urlparse(host)
+        self.scheme = host_url.scheme or "http"
+        self.host = host_url.netloc or host_url.path
+        self.base_url = f"{self.scheme}://{self.host}"
+        self.api_url = f"{self.base_url}/apps/api/{self.app_id}"
+
+        mac = _get_mac_address(self.host)
+        if self.mac and self.mac != mac:
+            raise InvalidConfig("Host address is for a different hub")
+        self.mac = mac or ""
 
     async def set_port(self, port: int) -> None:
         """Set the port that the event listener server will listen on.
