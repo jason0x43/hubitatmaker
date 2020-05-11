@@ -86,7 +86,7 @@ class Device:
             yield key, getattr(self, key)
 
     def __str__(self):
-        return f"<Device device_id={self.device_id}>"
+        return f'<Device id="{self.id}" name="{self.name}" type="{self.type}">'
 
 
 class Event:
