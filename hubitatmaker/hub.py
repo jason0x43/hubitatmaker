@@ -164,16 +164,14 @@ class Hub:
 
     def set_host(self, host: str) -> None:
         """Set the host address that the hub is accessible at."""
+        _LOGGER.debug("Setting host to %s", host)
         host_url = urlparse(host)
         self.scheme = host_url.scheme or "http"
         self.host = host_url.netloc or host_url.path
         self.base_url = f"{self.scheme}://{self.host}"
         self.api_url = f"{self.base_url}/apps/api/{self.app_id}"
-
-        mac = _get_mac_address(self.host)
-        if self.mac and self.mac != mac:
-            raise InvalidConfig("Host address is for a different hub")
-        self.mac = mac or ""
+        self.mac = _get_mac_address(self.host) or ""
+        _LOGGER.debug("Set mac to %s", self.mac)
 
     async def set_port(self, port: int) -> None:
         """Set the port that the event listener server will listen on.
