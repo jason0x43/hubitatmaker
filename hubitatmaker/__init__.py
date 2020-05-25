@@ -103,6 +103,7 @@ from .const import (
     CMD_SIREN,
     CMD_STROBE,
     CMD_UNLOCK,
+    DEFAULT_FAN_SPEEDS,
     STATE_ARMED_AWAY,
     STATE_ARMED_HOME,
     STATE_ARMED_NIGHT,
