@@ -117,6 +117,7 @@ from .const import (
     STATE_ON,
     STATE_OPEN,
     STATE_OPENING,
+    STATE_PARTIALLY_OPEN,
     STATE_UNKNOWN,
     STATE_UNLOCKED,
     STATE_UNLOCKED_WITH_TIMEOUT,
@@ -125,7 +126,7 @@ from .error import ConnectionError, InvalidConfig, InvalidToken, RequestError
 from .hub import Hub
 from .types import Attribute, Device, Event
 
-__version__ = "0.3.9"
+__version__ = "0.3.10"
 
 __all__ = [
     "ATTR_ACCELERATION",
@@ -254,6 +255,7 @@ __all__ = [
     "STATE_ON",
     "STATE_OPEN",
     "STATE_OPENING",
+    "STATE_PARTIALLY_OPEN",
     "STATE_UNKNOWN",
     "STATE_UNLOCKED",
     "STATE_UNLOCKED_WITH_TIMEOUT",
