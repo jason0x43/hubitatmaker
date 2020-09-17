@@ -9,9 +9,8 @@ fi
 
 case $op in
 	init)
-		pip3 install pipenv
-		pipenv install --dev
-		pipenv run pre-commit install
+		poetry install
+		poetry run pre-commit install
 		;;
 	
 	clean)
@@ -26,7 +25,6 @@ case $op in
 			exit 1
 		fi
 		rm -rf build dist
-		pipenv run python setup.py sdist bdist_wheel
 
 		echo "About to upload version $package_version from dist. If everything looks good, answer 'y': "
 		read answer
@@ -34,14 +32,14 @@ case $op in
 			exit 0
 		fi
 
-		pipenv run twine upload dist/*
+		poetry publish --build
 		git tag $package_version
 		git push --tags
 		;;
 
 	test)
-		pipenv run mypy hubitatmaker
-		pipenv run python setup.py test
+		poetry run mypy hubitatmaker
+		poetry run python setup.py test
 		;;
 
 	help)

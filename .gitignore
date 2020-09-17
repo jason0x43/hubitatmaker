@@ -1,6 +1,6 @@
-.adf/
 .envrc
 .vim/
+.venv/
 .mypy_cache/
 *.egg-info/
 .eggs/
