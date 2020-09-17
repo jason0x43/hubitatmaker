@@ -111,7 +111,7 @@ class Event:
 
     @property
     def type(self) -> Optional[str]:
-        return self._properties["type"]
+        return self._properties.get("type")
 
     @property
     def value(self) -> Union[str, float]:
