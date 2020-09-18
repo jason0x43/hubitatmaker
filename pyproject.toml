@@ -27,6 +27,7 @@ flake8 = "^3.8.3"
 mypy = "^0.782.0"
 pre-commit = "^2.7.1"
 isort = "^5.5.2"
+toml = "^0.10.1"
 
 [tool.poetry.scripts]
 init = "scripts:init"
