@@ -3,6 +3,18 @@ name = "hubitatmaker"
 version = "0.3.11"
 description = "A library for interfacing with Hubitat via its Maker API"
 authors = ["Jason Cheatham <jason@jasoncheatham.com>"]
+readme = "README.md"
+homepage = "https://github.com/jason0x43/hubitatmaker"
+repository = "https://github.com/jason0x43/hubitatmaker"
+keywords = ["hubitat"]
+license = "MIT"
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: OS Independent",
+]
+include = ["LICENSE"]
 
 [tool.poetry.dependencies]
 aiohttp = "^3.6.2"
