@@ -37,6 +37,7 @@ from .const import (
     ATTR_VOLTAGE,
     ATTR_WATER,
     ATTR_WINDOW_SHADE,
+    ATTR_PRESSURE,
     CAP_ALARM,
     CAP_COLOR_CONTROL,
     CAP_COLOR_TEMP,
@@ -126,7 +127,7 @@ from .error import ConnectionError, InvalidConfig, InvalidToken, RequestError
 from .hub import Hub
 from .types import Attribute, Device, Event
 
-__version__ = "0.3.12"
+__version__ = "0.3.13"
 
 __all__ = [
     "ATTR_ACCELERATION",
@@ -167,6 +168,7 @@ __all__ = [
     "ATTR_VOLTAGE",
     "ATTR_WATER",
     "ATTR_WINDOW_SHADE",
+    "ATTR_PRESSURE",
     "Attribute",
     "CAP_ALARM",
     "CAP_COLOR_CONTROL",
