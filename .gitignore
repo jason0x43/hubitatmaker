@@ -6,3 +6,4 @@
 .eggs/
 build/
 dist/
+*.pyc

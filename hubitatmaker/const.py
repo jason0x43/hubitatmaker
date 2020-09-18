@@ -62,6 +62,7 @@ ATTR_WATER = "water"
 ATTR_WINDOW_SHADE = "windowShade"
 ATTR_SPEED = "speed"
 ATTR_SWITCH = "switch"
+ATTR_PRESSURE = "pressure"
 
 CMD_ARM_AWAY = "armAway"
 CMD_ARM_HOME = "armHome"
