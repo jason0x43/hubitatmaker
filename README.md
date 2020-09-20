@@ -32,11 +32,11 @@ if __name__ == '__main__':
 To get setup for development, run
 
 ```
-$ ./dev init
+$ poetry run init
 ```
 
 To test the code, which will type check it and run unit tests, run
 
 ```
-$ ./dev test
+$ poetry run test
 ```
