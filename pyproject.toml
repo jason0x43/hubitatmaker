@@ -19,7 +19,7 @@ include = ["LICENSE"]
 [tool.poetry.dependencies]
 aiohttp = "^3.6.2"
 getmac = "^0.8.2"
-python = "^3.7.7"
+python = "^3.7.1"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
