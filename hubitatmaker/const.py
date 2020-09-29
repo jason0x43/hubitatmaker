@@ -1,5 +1,6 @@
 CAP_ALARM = "Alarm"
 CAP_COLOR_CONTROL = "ColorControl"
+CAP_COLOR_MODE = "ColorMode"
 CAP_COLOR_TEMP = "ColorTemperature"
 CAP_CONTACT_SENSOR = "ContactSensor"
 CAP_DOOR_CONTROL = "DoorControl"
@@ -135,3 +136,6 @@ DEFAULT_FAN_SPEEDS = [
     "off",
     "auto",
 ]
+
+COLOR_MODE_RGB = "RBG"
+COLOR_MODE_CT = "CT"
