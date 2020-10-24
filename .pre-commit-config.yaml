@@ -31,9 +31,9 @@ repos:
     files: ^(hubitatmaker|tests)/.+\.py$
 - repo: local
   hooks:
-  - id: mypy
-    name: mypy
-    entry: poetry run mypy
+  - id: pyright
+    name: pyright
+    entry: pyright
     language: system
     types: [python]
     require_serial: true

@@ -35,5 +35,5 @@ def publish():
 
 
 def test():
-    call("poetry run mypy hubitatmaker", shell=True)
+    call("pyright hubitatmaker", shell=True)
     call("poetry run python -m unittest discover", shell=True)

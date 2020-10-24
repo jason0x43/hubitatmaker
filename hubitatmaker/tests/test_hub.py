@@ -1,9 +1,8 @@
 import asyncio
 import json
-import re
-import sys
 from os.path import dirname, join
-from typing import Any, Coroutine, Dict, List, cast
+import re
+from typing import Any, Coroutine, Dict, List
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -47,8 +46,6 @@ requests: List[Dict[str, Any]] = []
 
 class fake_request:
     def __init__(self, method: str, url: str, **kwargs: Any):
-        data = kwargs
-
         if url.endswith("/hub/edit"):
             self.response = FakeResponse(text=hub_edit_page)
         elif url.endswith("/devices"):
@@ -78,6 +75,7 @@ def fake_get_mac_address(**kwargs: str):
 
 class TestHub(TestCase):
     def setUp(self):
+        global requests
         requests = []
 
     def test_hub_checks_arguments(self) -> None:
@@ -110,11 +108,11 @@ class TestHub(TestCase):
         """start() should request data from the Hubitat hub."""
         hub = Hub("1.2.3.4", "1234", "token")
         run(hub.start())
-        # 33 requests - 1 to get device list, 32 to update devices
-        self.assertEqual(len(requests), 33)
+        # 11 requests - 1 to get device list, 10 to update devices
+        self.assertEqual(len(requests), 11)
         self.assertRegex(requests[1]["url"], "devices$")
-        self.assertRegex(requests[2]["url"], "devices/\d+$")
-        self.assertRegex(requests[-1]["url"], "devices/\d+$")
+        self.assertRegex(requests[2]["url"], r"devices/\d+$")
+        self.assertRegex(requests[-1]["url"], r"devices/\d+$")
 
     @patch("aiohttp.request", new=fake_request)
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
