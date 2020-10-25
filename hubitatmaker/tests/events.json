@@ -1,13 +1,25 @@
 [
-   {
-      "content": {
-         "name": "switch",
-         "value": "on",
-         "displayName": "Loft Fan",
-         "descriptionText": "Loft Fan is on",
-         "deviceId": "176",
-         "unit": null,
-         "data": null
-      }
-   }
+  {
+    "content": {
+      "name": "switch",
+      "value": "on",
+      "displayName": "Loft Fan",
+      "descriptionText": "Loft Fan is on",
+      "deviceId": "176",
+      "unit": null,
+      "data": null
+    }
+  },
+  {
+    "content": {
+      "name": "ssdpTerm",
+      "value": "urn:schemas-upnp-org:device:basic:1",
+      "displayName": null,
+      "deviceId": null,
+      "descriptionText": null,
+      "unit": null,
+      "type": null,
+      "data": null
+    }
+  }
 ]

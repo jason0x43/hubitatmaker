@@ -164,13 +164,14 @@ class Hub:
             return
 
         device_id = content["deviceId"]
-        self._update_device_attr(device_id, content["name"], content["value"])
+        if device_id is not None:
+            self._update_device_attr(device_id, content["name"], content["value"])
 
-        evt = Event(content)
+            evt = Event(content)
 
-        if device_id in self._listeners:
-            for listener in self._listeners[device_id]:
-                listener(evt)
+            if device_id in self._listeners:
+                for listener in self._listeners[device_id]:
+                    listener(evt)
 
     def set_host(self, host: str) -> None:
         """Set the host address that the hub is accessible at."""

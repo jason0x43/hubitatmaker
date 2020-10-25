@@ -173,3 +173,19 @@ class TestHub(TestCase):
 
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "on")
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_process_non_device_event(self, MockServer) -> None:
+        """Started hub should ignore non-device events."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        run(hub.start())
+        device = hub.devices["176"]
+        attr = device.attributes["switch"]
+        self.assertEqual(attr.value, "off")
+
+        hub.process_event(events[1])
+
+        attr = device.attributes["switch"]
+        self.assertEqual(attr.value, "off")
