@@ -98,6 +98,11 @@ class Hub:
         return None
 
     @property
+    def modes(self) -> List[str]:
+        """Return the available hub modes."""
+        return [m.name for m in self._modes]
+
+    @property
     def hsm_status(self) -> str:
         return self._hsm_status
 
@@ -213,7 +218,35 @@ class Hub:
         new_modes: List[Dict[str, Any]] = await self._api_request(f"modes/{id}")
         self._modes = [Mode(m) for m in new_modes]
 
-    def process_event(self, event: Dict[str, Any]) -> None:
+    def set_host(self, host: str) -> None:
+        """Set the host address that the hub is accessible at."""
+        _LOGGER.debug("Setting host to %s", host)
+        host_url = urlparse(host)
+        self.scheme = host_url.scheme or "http"
+        self.host = host_url.netloc or host_url.path
+        self.base_url = f"{self.scheme}://{self.host}"
+        self.api_url = f"{self.base_url}/apps/api/{self.app_id}"
+        self.mac = _get_mac_address(self.host) or ""
+        _LOGGER.debug("Set mac to %s", self.mac)
+
+    async def set_port(self, port: int) -> None:
+        """Set the port that the event listener server will listen on.
+
+        Setting this will stop and restart the event listener server.
+        """
+        self.port = port
+        if self._server:
+            self._server.stop()
+        await self._start_server()
+
+    async def _check_api(self) -> None:
+        """Check for api access.
+
+        An error will be raised if a test API request fails.
+        """
+        await self._api_request("devices")
+
+    def _process_event(self, event: Dict[str, Any]) -> None:
         """Process an event received from the hub."""
         try:
             content = event["content"]
@@ -257,38 +290,6 @@ class Hub:
             evt = Event(content)
             for listener in self._listeners.get(ID_HSM_STATUS, []):
                 listener(evt)
-
-    def set_host(self, host: str) -> None:
-        """Set the host address that the hub is accessible at."""
-        _LOGGER.debug("Setting host to %s", host)
-        host_url = urlparse(host)
-        self.scheme = host_url.scheme or "http"
-        self.host = host_url.netloc or host_url.path
-        self.base_url = f"{self.scheme}://{self.host}"
-        self.api_url = f"{self.base_url}/apps/api/{self.app_id}"
-        self.mac = _get_mac_address(self.host) or ""
-        _LOGGER.debug("Set mac to %s", self.mac)
-
-    async def get_modes(self) -> List[Mode]:
-        """Get the available hub modes."""
-        return self._modes
-
-    async def set_port(self, port: int) -> None:
-        """Set the port that the event listener server will listen on.
-
-        Setting this will stop and restart the event listener server.
-        """
-        self.port = port
-        if self._server:
-            self._server.stop()
-        await self._start_server()
-
-    async def _check_api(self) -> None:
-        """Check for api access.
-
-        An error will be raised if a test API request fails.
-        """
-        await self._api_request("devices")
 
     def _update_device_attr(
         self, device_id: str, attr_name: str, value: Union[int, str]
@@ -371,7 +372,9 @@ class Hub:
             s.connect((self.host, 80))
             address = s.getsockname()[0]
 
-        self._server = server.create_server(self.process_event, address, self.port or 0)
+        self._server = server.create_server(
+            self._process_event, address, self.port or 0
+        )
         self._server.start()
         _LOGGER.debug("Listening on %s:%d", address, self._server.port)
 

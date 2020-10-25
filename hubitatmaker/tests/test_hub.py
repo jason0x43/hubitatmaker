@@ -226,7 +226,7 @@ class TestHub(TestCase):
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
 
-        hub.process_event(events["device"])
+        hub._process_event(events["device"])
 
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "on")
@@ -245,11 +245,11 @@ class TestHub(TestCase):
             nonlocal handler_called
             handler_called = True
 
-        hub.process_event(events["mode"])
+        hub._process_event(events["mode"])
         self.assertFalse(handler_called)
 
         hub.add_mode_listener(listener)
-        hub.process_event(events["mode"])
+        hub._process_event(events["mode"])
         self.assertTrue(handler_called)
 
     @patch("aiohttp.request", new=fake_request)
@@ -266,11 +266,11 @@ class TestHub(TestCase):
             nonlocal handler_called
             handler_called = True
 
-        hub.process_event(events["hsm"])
+        hub._process_event(events["hsm"])
         self.assertFalse(handler_called)
 
         hub.add_hsm_listener(listener)
-        hub.process_event(events["hsm"])
+        hub._process_event(events["hsm"])
         self.assertTrue(handler_called)
 
     @patch("aiohttp.request", new=fake_request)
@@ -284,7 +284,7 @@ class TestHub(TestCase):
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
 
-        hub.process_event(events["other"])
+        hub._process_event(events["other"])
 
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
@@ -300,7 +300,7 @@ class TestHub(TestCase):
         wait_for(hub.set_hsm(HSM_DISARM))
         self.assertRegex(requests[-1]["url"], f"hsm/{HSM_DISARM}$")
 
-        hub.process_event(events["hsm"])
+        hub._process_event(events["hsm"])
         self.assertEqual(hub.hsm_status, "armedAway")
 
     @patch("aiohttp.request", new=fake_request)
@@ -314,5 +314,5 @@ class TestHub(TestCase):
         wait_for(hub.set_mode("Evening"))
         self.assertRegex(requests[-1]["url"], "modes/2$")
 
-        hub.process_event(events["mode"])
+        hub._process_event(events["mode"])
         self.assertEqual(hub.mode, "Evening")
