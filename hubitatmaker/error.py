@@ -15,6 +15,13 @@ class InvalidConfig(Exception):
     """Error indicating invalid hub config data."""
 
 
+class InvalidMode(Exception):
+    """Error indicating that a mode is invalid."""
+
+    def __init__(self, mode: str, **kwargs):
+        super().__init__(f"Invalid mode '{mode}'")
+
+
 class RequestError(Exception):
     """An error indicating that a request failed."""
 

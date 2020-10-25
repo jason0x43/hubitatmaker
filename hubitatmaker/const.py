@@ -126,6 +126,8 @@ STATE_UNKNOWN = "unknown"
 STATE_UNLOCKED = "unlocked"
 STATE_UNLOCKED_WITH_TIMEOUT = "unlocked with timeout"
 
+ID_MODE = "hub_mode"
+
 DEFAULT_FAN_SPEEDS = [
     "low",
     "medium-low",

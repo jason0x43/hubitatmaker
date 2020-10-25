@@ -130,3 +130,35 @@ class Event:
 
     def __str__(self) -> str:
         return f'<Event device_id="{self.device_id}" device_name="{self.device_name}" attribute="{self.attribute}" value="{self.value}" description="{self.description}" type="{self.type}">'
+
+
+class Mode:
+    def __init__(self, properties: Dict[str, Any]):
+        self._properties = properties
+
+    @property
+    def active(self) -> bool:
+        return self._properties["active"]
+
+    @active.setter
+    def active(self, value: bool) -> None:
+        self._properties["active"] = value
+
+    @property
+    def id(self) -> int:
+        return self._properties.get("id", -1)
+
+    @property
+    def name(self) -> str:
+        return self._properties["name"]
+
+    def __iter__(self):
+        for key in (
+            "active",
+            "id",
+            "name",
+        ):
+            yield key, getattr(self, key)
+
+    def __str__(self) -> str:
+        return f'<Mode id="{self.id}" name="{self.name}" active="{self.active}"'

@@ -11,8 +11,9 @@ import aiohttp
 import getmac
 
 from . import server
-from .error import InvalidConfig, InvalidToken, RequestError
-from .types import Device, Event
+from .const import ID_MODE
+from .error import InvalidConfig, InvalidMode, InvalidToken, RequestError
+from .types import Device, Event, Mode
 
 Listener = Callable[[Event], None]
 
@@ -74,6 +75,7 @@ class Hub:
         self._devices: Dict[str, Device] = {}
         self._listeners: Dict[str, List[Listener]] = {}
         self._conn = None
+        self._modes: List[Mode] = []
 
         _LOGGER.info("Created hub %s", self)
 
@@ -86,15 +88,33 @@ class Hub:
         """Return a list of devices managed by the Hubitat hub."""
         return MappingProxyType(self._devices)
 
+    @property
+    def mode(self) -> Optional[str]:
+        """Return the current hub mode."""
+        for mode in self._modes:
+            if mode.active:
+                return mode.name
+        return None
+
     def add_device_listener(self, device_id: str, listener: Listener) -> None:
         """Listen for updates for a particular device."""
         if device_id not in self._listeners:
             self._listeners[device_id] = []
         self._listeners[device_id].append(listener)
 
+    def add_mode_listener(self, listener: Listener) -> None:
+        """Listen for updates for the hub mode."""
+        if ID_MODE not in self._listeners:
+            self._listeners[ID_MODE] = []
+        self._listeners[ID_MODE].append(listener)
+
     def remove_device_listeners(self, device_id: str) -> None:
         """Remove all listeners for a particular device."""
         self._listeners[device_id] = []
+
+    def remove_mode_listeners(self) -> None:
+        """Remove all listeners for mode changes."""
+        self._listeners[ID_MODE] = []
 
     async def check_config(self) -> None:
         """Verify that the hub is accessible.
@@ -122,6 +142,7 @@ class Hub:
 
         try:
             await self._start_server()
+            await self._load_modes()
             await self._load_devices()
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
@@ -154,6 +175,20 @@ class Hub:
         url = quote(str(event_url), safe="")
         await self._api_request(f"postURL/{url}")
 
+    async def set_mode(self, name: str) -> None:
+        """Update the hub's mode"""
+        id = None
+        for mode in self._modes:
+            if mode.name == name:
+                id = mode.id
+                break
+        if id is None:
+            _LOGGER.error("Invalid mode: %s", name)
+            raise InvalidMode(name)
+
+        new_modes: List[Dict[str, Any]] = await self._api_request(f"modes/{id}")
+        self._modes = [Mode(m) for m in new_modes]
+
     def process_event(self, event: Dict[str, Any]) -> None:
         """Process an event received from the hub."""
         try:
@@ -163,14 +198,35 @@ class Hub:
             _LOGGER.warning("Received invalid event: %s", event)
             return
 
-        device_id = content["deviceId"]
-        if device_id is not None:
+        if content["deviceId"] is not None:
+            device_id = content["deviceId"]
             self._update_device_attr(device_id, content["name"], content["value"])
 
             evt = Event(content)
 
             if device_id in self._listeners:
                 for listener in self._listeners[device_id]:
+                    listener(evt)
+        elif content["name"] == "mode":
+            name = content["value"]
+            mode_set = False
+            for mode in self._modes:
+                if mode.name == name:
+                    mode.active = True
+                    mode_set = True
+                else:
+                    mode.active = False
+
+            # If the mode wasn't set, this is a new mode. Add a placeholder
+            # to the modes list, and reload the modes
+            if not mode_set:
+                self._modes.append(Mode({"active": True, "name": name}))
+                self._load_modes()
+
+            evt = Event(content)
+
+            if ID_MODE in self._listeners:
+                for listener in self._listeners[ID_MODE]:
                     listener(evt)
 
     def set_host(self, host: str) -> None:
@@ -183,6 +239,10 @@ class Hub:
         self.api_url = f"{self.base_url}/apps/api/{self.app_id}"
         self.mac = _get_mac_address(self.host) or ""
         _LOGGER.debug("Set mac to %s", self.mac)
+
+    async def get_modes(self) -> List[Mode]:
+        """Get the available hub modes."""
+        return self._modes
 
     async def set_port(self, port: int) -> None:
         """Set the port that the event listener server will listen on.
@@ -244,6 +304,12 @@ class Hub:
                 _LOGGER.error("Invalid device info: %s", json)
                 raise e
             _LOGGER.debug("Loaded device %s", device_id)
+
+    async def _load_modes(self) -> None:
+        """Load the current hub mode."""
+        modes: List[Dict[str, Any]] = await self._api_request("modes")
+        _LOGGER.debug("Loaded modes")
+        self._modes = [Mode(m) for m in modes]
 
     async def _api_request(self, path: str, method="GET") -> Any:
         """Make a Maker API request."""

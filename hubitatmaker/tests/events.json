@@ -21,5 +21,17 @@
       "type": null,
       "data": null
     }
+  },
+  {
+    "content": {
+      "name": "mode",
+      "value": "Evening",
+      "displayName": "Home",
+      "deviceId": null,
+      "descriptionText": "Home is now in Evening mode",
+      "unit": null,
+      "type": "LOCATION_MODE_CHANGE",
+      "data": null
+    }
   }
 ]
