@@ -37,7 +37,14 @@ class Hub:
     _server: server.Server
     _conn: Optional[aiohttp.TCPConnector]
 
-    def __init__(self, host: str, app_id: str, access_token: str, port: int = None):
+    def __init__(
+        self,
+        host: str,
+        app_id: str,
+        access_token: str,
+        port: int = None,
+        event_url: str = None,
+    ):
         """Initialize a Hubitat hub interface.
 
         host:
@@ -50,10 +57,13 @@ class Hub:
           The access token for the Maker API instance
         port:
           The port to listen on for events (optional). Defaults to a random open port.
+        event_url:
+          The URL that Hubitat should send events to (optional). Defaults the server's actual address and port.
         """
         if not host or not app_id or not access_token:
             raise InvalidConfig()
 
+        self.event_url = event_url
         self.port = port
         self.app_id = app_id
         self.token = access_token
@@ -263,7 +273,7 @@ class Hub:
         self._server.start()
         _LOGGER.debug("Listening on %s:%d", address, self._server.port)
 
-        await self.set_event_url(self._server.url)
+        await self.set_event_url(self.event_url or self._server.url)
 
 
 @contextmanager

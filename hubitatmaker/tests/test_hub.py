@@ -5,6 +5,7 @@ import re
 from typing import Any, Coroutine, Dict, List
 from unittest import TestCase
 from unittest.mock import patch
+from urllib.parse import unquote
 
 from hubitatmaker.hub import Hub, InvalidConfig
 
@@ -108,11 +109,34 @@ class TestHub(TestCase):
         """start() should request data from the Hubitat hub."""
         hub = Hub("1.2.3.4", "1234", "token")
         run(hub.start())
-        # 11 requests - 1 to get device list, 10 to update devices
+        # 11 requests - 1 to set the event URL, 1 to get the device list, 10 to
+        # update devices
         self.assertEqual(len(requests), 11)
         self.assertRegex(requests[1]["url"], "devices$")
         self.assertRegex(requests[2]["url"], r"devices/\d+$")
         self.assertRegex(requests[-1]["url"], r"devices/\d+$")
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_default_event_url(self, MockServer) -> None:
+        """Default event URL should be server URL."""
+        MockServer.return_value.url = "http://127.0.0.1:81"
+        hub = Hub("1.2.3.4", "1234", "token")
+        run(hub.start())
+        url = unquote(requests[0]["url"])
+        self.assertRegex(url, r"http://127.0.0.1:81$")
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_custom_event_url(self, MockServer) -> None:
+        """Event URL should be configurable."""
+        MockServer.return_value.url = "http://127.0.0.1:81"
+        hub = Hub("1.2.3.4", "1234", "token", event_url="http://foo.local")
+        run(hub.start())
+        url = unquote(requests[0]["url"])
+        self.assertRegex(url, r"http://foo\.local$")
 
     @patch("aiohttp.request", new=fake_request)
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
