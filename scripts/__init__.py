@@ -7,6 +7,7 @@ import toml
 
 def init():
     call("poetry install", shell=True)
+    call("npm install -g pyright", shell=True)
     call("poetry run pre-commit install", shell=True)
 
 
