@@ -2,6 +2,38 @@
 
 This library provides an async Python interface for Hubitat Elevation’s Maker API. It is primarily intended for use with Home Assistant.
 
+<!-- vim-markdown-toc GFM -->
+
+* [Features](#features)
+* [Basic usage](#basic-usage)
+* [API](#api)
+	* [Hub](#hub)
+		* [Properties](#properties)
+			* [devices](#devices)
+			* [mode](#mode)
+			* [modes](#modes)
+			* [hsm_status](#hsm_status)
+		* [Methods](#methods)
+			* [\_\_init\_\_(host, app_id, access_token, port, event_url)](#__init__host-app_id-access_token-port-event_url)
+			* [add_device_listener(device_id, listener)](#add_device_listenerdevice_id-listener)
+			* [add_hsm_listener(listener)](#add_hsm_listenerlistener)
+			* [add_mode_listener(listener)](#add_mode_listenerlistener)
+			* [async check_config()](#async-check_config)
+			* [async refresh_device(device_id)](#async-refresh_devicedevice_id)
+			* [remove_device_listeners(device_id)](#remove_device_listenersdevice_id)
+			* [remove_hsm_listeners()](#remove_hsm_listeners)
+			* [remove_mode_listeners()](#remove_mode_listeners)
+			* [async send_command(device_id, command, arg)](#async-send_commanddevice_id-command-arg)
+			* [async set_event_url(event_url)](#async-set_event_urlevent_url)
+			* [async set_hsm(hsm_state)](#async-set_hsmhsm_state)
+			* [async set_host(mode)](#async-set_hostmode)
+			* [async set_mode(mode)](#async-set_modemode)
+			* [async set_port(port)](#async-set_portport)
+			* [async stop()](#async-stop)
+* [Developing](#developing)
+
+<!-- vim-markdown-toc -->
+
 ## Features
 
 The main public API in hubitatmaker is the Hub class. This class represents a Maker API instance on a Hubitat hub. When started, a Hub instance will determine the Hubitat hub's MAC address and and download a list of available devices and details about each device.
