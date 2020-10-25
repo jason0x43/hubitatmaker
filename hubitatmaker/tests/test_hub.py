@@ -7,13 +7,15 @@ from unittest import TestCase
 from unittest.mock import patch
 from urllib.parse import unquote
 
+from hubitatmaker.const import HSM_DISARM
 from hubitatmaker.hub import Hub, InvalidConfig
 
 hub_edit_page: str
 devices: Dict[str, Any]
 device_details: Dict[str, Any]
-events: List[Dict[str, Any]]
+events: Dict[str, Dict[str, Any]]
 modes: List[Dict[str, Any]]
+hsm: Dict[str, str]
 
 
 def load_data():
@@ -22,6 +24,7 @@ def load_data():
     global device_details
     global events
     global modes
+    global hsm
 
     with open(join(dirname(__file__), "hub_edit.html")) as f:
         hub_edit_page = f.read()
@@ -37,6 +40,9 @@ def load_data():
 
     with open(join(dirname(__file__), "modes.json")) as f:
         modes = json.loads(f.read())
+
+    with open(join(dirname(__file__), "hsm.json")) as f:
+        hsm = json.loads(f.read())
 
 
 def wait_for(cr: Coroutine) -> Any:
@@ -74,6 +80,8 @@ class fake_request:
             self.response = FakeResponse(data=devices)
         elif url.endswith("/modes"):
             self.response = FakeResponse(data=modes)
+        elif url.endswith("/hsm"):
+            self.response = FakeResponse(data=hsm)
         elif re.match(".*/modes/(\\d+)$", url):
             mode_match = re.match(".*/modes/(\\d+)$", url)
             mode_id = mode_match.group(1)
@@ -89,6 +97,13 @@ class fake_request:
                     else:
                         mode["active"] = False
             self.response = FakeResponse(data=modes)
+        elif re.match(".*/hsm/(\\w+)$", url):
+            hsm_match = re.match(".*/hsm/(\\w+)$", url)
+            hsm_mode = hsm_match.group(1)
+            new_mode = "disarmed"
+            if hsm_mode == HSM_DISARM:
+                new_mode = "disarmed"
+            self.response = FakeResponse(data={"hsm": new_mode})
         elif re.match(".*/devices/(\\d+)$", url):
             dev_match = re.match(".*/devices/(\\d+)$", url)
             dev_id = dev_match.group(1)
@@ -145,15 +160,17 @@ class TestHub(TestCase):
         """start() should request data from the Hubitat hub."""
         hub = Hub("1.2.3.4", "1234", "token")
         wait_for(hub.start())
-        # 12 requests:
+        # 13 requests:
         #   0: set event URL
         #   1: request modes
-        #   2: request devices
-        #   3...: request device details
-        self.assertEqual(len(requests), 12)
+        #   2: request hsm status
+        #   3: request devices
+        #   4...: request device details
+        self.assertEqual(len(requests), 13)
         self.assertRegex(requests[1]["url"], "modes$")
-        self.assertRegex(requests[2]["url"], "devices$")
-        self.assertRegex(requests[3]["url"], r"devices/\d+$")
+        self.assertRegex(requests[2]["url"], "hsm$")
+        self.assertRegex(requests[3]["url"], "devices$")
+        self.assertRegex(requests[4]["url"], r"devices/\d+$")
         self.assertRegex(requests[-1]["url"], r"devices/\d+$")
 
     @patch("aiohttp.request", new=fake_request)
@@ -209,7 +226,7 @@ class TestHub(TestCase):
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
 
-        hub.process_event(events[0])
+        hub.process_event(events["device"])
 
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "on")
@@ -224,15 +241,36 @@ class TestHub(TestCase):
 
         handler_called = False
 
-        def listen_mode(_: Any):
+        def listener(_: Any):
             nonlocal handler_called
             handler_called = True
 
-        hub.process_event(events[2])
+        hub.process_event(events["mode"])
         self.assertFalse(handler_called)
 
-        hub.add_mode_listener(listen_mode)
-        hub.process_event(events[2])
+        hub.add_mode_listener(listener)
+        hub.process_event(events["mode"])
+        self.assertTrue(handler_called)
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_process_hsm_event(self, MockServer) -> None:
+        """Started hub should emit HSM events."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        wait_for(hub.start())
+
+        handler_called = False
+
+        def listener(_: Any):
+            nonlocal handler_called
+            handler_called = True
+
+        hub.process_event(events["hsm"])
+        self.assertFalse(handler_called)
+
+        hub.add_hsm_listener(listener)
+        hub.process_event(events["hsm"])
         self.assertTrue(handler_called)
 
     @patch("aiohttp.request", new=fake_request)
@@ -246,10 +284,24 @@ class TestHub(TestCase):
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
 
-        hub.process_event(events[1])
+        hub.process_event(events["other"])
 
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_process_set_hsm(self, MockServer) -> None:
+        """Started hub should allow mode to be updated."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        wait_for(hub.start())
+        self.assertEqual(hub.hsm_status, "armedAway")
+        wait_for(hub.set_hsm(HSM_DISARM))
+        self.assertRegex(requests[-1]["url"], f"hsm/{HSM_DISARM}$")
+
+        hub.process_event(events["hsm"])
+        self.assertEqual(hub.hsm_status, "armedAway")
 
     @patch("aiohttp.request", new=fake_request)
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
@@ -262,5 +314,5 @@ class TestHub(TestCase):
         wait_for(hub.set_mode("Evening"))
         self.assertRegex(requests[-1]["url"], "modes/2$")
 
-        hub.process_event(events[2])
+        hub.process_event(events["mode"])
         self.assertEqual(hub.mode, "Evening")

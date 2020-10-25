@@ -1,5 +1,5 @@
-[
-  {
+{
+  "device": {
     "content": {
       "name": "switch",
       "value": "on",
@@ -10,7 +10,7 @@
       "data": null
     }
   },
-  {
+  "other": {
     "content": {
       "name": "ssdpTerm",
       "value": "urn:schemas-upnp-org:device:basic:1",
@@ -22,7 +22,7 @@
       "data": null
     }
   },
-  {
+  "mode": {
     "content": {
       "name": "mode",
       "value": "Evening",
@@ -33,5 +33,17 @@
       "type": "LOCATION_MODE_CHANGE",
       "data": null
     }
+  },
+  "hsm": {
+    "content": {
+      "name": "hsmStatus",
+      "value": "armedAway",
+      "displayName": "Home",
+      "deviceId": null,
+      "descriptionText": "hsmEvent",
+      "unit": null,
+      "type": null,
+      "data": null
+    }
   }
-]
+}

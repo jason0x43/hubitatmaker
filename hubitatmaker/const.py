@@ -109,6 +109,19 @@ CMD_UNLOCK = "unlock"
 CMD_SET_SPEED = "setSpeed"
 CMD_CYCLE_SPEED = "cycleSpeed"
 
+HSM_ARM_ALL = "armAll"
+HSM_ARM_AWAY = "armAway"
+HSM_ARM_HOME = "armHome"
+HSM_ARM_NIGHT = "armNight"
+HSM_ARM_RULES = "armRules"
+HSM_CANCEL_ALERTS = "cancelAlerts"
+HSM_DISARM = "disarm"
+HSM_DISARM_ALL = "disarmAll"
+HSM_DISARM_RULES = "disarmRules"
+
+ID_MODE = "hub_mode"
+ID_HSM_STATUS = "hub_hsm_status"
+
 STATE_ARMED_AWAY = "armed away"
 STATE_ARMED_HOME = "armed home"
 STATE_ARMED_NIGHT = "armed night"
@@ -125,8 +138,6 @@ STATE_PARTIALLY_OPEN = "partially open"
 STATE_UNKNOWN = "unknown"
 STATE_UNLOCKED = "unlocked"
 STATE_UNLOCKED_WITH_TIMEOUT = "unlocked with timeout"
-
-ID_MODE = "hub_mode"
 
 DEFAULT_FAN_SPEEDS = [
     "low",

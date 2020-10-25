@@ -11,7 +11,7 @@ import aiohttp
 import getmac
 
 from . import server
-from .const import ID_MODE
+from .const import ID_HSM_STATUS, ID_MODE
 from .error import InvalidConfig, InvalidMode, InvalidToken, RequestError
 from .types import Device, Event, Mode
 
@@ -76,6 +76,7 @@ class Hub:
         self._listeners: Dict[str, List[Listener]] = {}
         self._conn = None
         self._modes: List[Mode] = []
+        self._hsm_status: str = "disarmed"
 
         _LOGGER.info("Created hub %s", self)
 
@@ -96,6 +97,10 @@ class Hub:
                 return mode.name
         return None
 
+    @property
+    def hsm_status(self) -> str:
+        return self._hsm_status
+
     def add_device_listener(self, device_id: str, listener: Listener) -> None:
         """Listen for updates for a particular device."""
         if device_id not in self._listeners:
@@ -108,6 +113,12 @@ class Hub:
             self._listeners[ID_MODE] = []
         self._listeners[ID_MODE].append(listener)
 
+    def add_hsm_listener(self, listener: Listener) -> None:
+        """Listen for updates for the hub HSM status."""
+        if ID_HSM_STATUS not in self._listeners:
+            self._listeners[ID_HSM_STATUS] = []
+        self._listeners[ID_HSM_STATUS].append(listener)
+
     def remove_device_listeners(self, device_id: str) -> None:
         """Remove all listeners for a particular device."""
         self._listeners[device_id] = []
@@ -115,6 +126,10 @@ class Hub:
     def remove_mode_listeners(self) -> None:
         """Remove all listeners for mode changes."""
         self._listeners[ID_MODE] = []
+
+    def remove_hsm_status_listeners(self) -> None:
+        """Remove all listeners for HSM status changes."""
+        self._listeners[ID_HSM_STATUS] = []
 
     async def check_config(self) -> None:
         """Verify that the hub is accessible.
@@ -143,6 +158,7 @@ class Hub:
         try:
             await self._start_server()
             await self._load_modes()
+            await self._load_hsm_status()
             await self._load_devices()
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
@@ -174,6 +190,14 @@ class Hub:
         _LOGGER.info("Setting event update URL to %s", event_url)
         url = quote(str(event_url), safe="")
         await self._api_request(f"postURL/{url}")
+
+    async def set_hsm(self, hsm_mode: str) -> None:
+        """Update the hub's HSM status.
+
+        hsm_mode must be one of the HSM_* constants.
+        """
+        new_mode: Dict[str, str] = await self._api_request(f"hsm/{hsm_mode}")
+        self._hsm_status = new_mode["hsm"]
 
     async def set_mode(self, name: str) -> None:
         """Update the hub's mode"""
@@ -225,9 +249,14 @@ class Hub:
 
             evt = Event(content)
 
-            if ID_MODE in self._listeners:
-                for listener in self._listeners[ID_MODE]:
-                    listener(evt)
+            for listener in self._listeners.get(ID_MODE, []):
+                listener(evt)
+
+        elif content["name"] == "hsmStatus":
+            self._hsm_status = content["value"]
+            evt = Event(content)
+            for listener in self._listeners.get(ID_HSM_STATUS, []):
+                listener(evt)
 
     def set_host(self, host: str) -> None:
         """Set the host address that the hub is accessible at."""
@@ -304,6 +333,12 @@ class Hub:
                 _LOGGER.error("Invalid device info: %s", json)
                 raise e
             _LOGGER.debug("Loaded device %s", device_id)
+
+    async def _load_hsm_status(self) -> None:
+        """Load the current hub HSM status."""
+        hsm: Dict[str, str] = await self._api_request("hsm")
+        _LOGGER.debug("Loaded hsm status")
+        self._hsm_status = hsm["hsm"]
 
     async def _load_modes(self) -> None:
         """Load the current hub mode."""
