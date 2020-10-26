@@ -190,10 +190,12 @@ class Hub:
         _LOGGER.debug("Sending command %s(%s) to %s", command, arg, device_id)
         return await self._api_request(path)
 
-    async def set_event_url(self, event_url: str) -> None:
+    async def set_event_url(self, event_url: Optional[str]) -> None:
         """Set the URL that Hubitat will POST device events to."""
-        _LOGGER.info("Setting event update URL to %s", event_url)
+        if not event_url:
+            event_url = self._server.url
         url = quote(str(event_url), safe="")
+        _LOGGER.info("Setting event update URL to %s", url)
         await self._api_request(f"postURL/{url}")
 
     async def set_hsm(self, hsm_mode: str) -> None:
@@ -378,7 +380,7 @@ class Hub:
         self._server.start()
         _LOGGER.debug("Listening on %s:%d", address, self._server.port)
 
-        await self.set_event_url(self.event_url or self._server.url)
+        await self.set_event_url(self.event_url)
 
 
 @contextmanager

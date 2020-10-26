@@ -316,3 +316,22 @@ class TestHub(TestCase):
 
         hub._process_event(events["mode"])
         self.assertEqual(hub.mode, "Evening")
+
+    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_set_event_url(self, MockServer) -> None:
+        """Started hub should allow mode to be updated."""
+        server_url = "http://127.0.0.1:81"
+        MockServer.return_value.url = server_url
+        hub = Hub("1.2.3.4", "1234", "token")
+        wait_for(hub.start())
+
+        wait_for(hub.set_event_url(None))
+        event_url = unquote(requests[-1]["url"])
+        self.assertRegex(event_url, f"postURL/{server_url}$")
+
+        other_url = "http://10.0.1.1:4443"
+        wait_for(hub.set_event_url(other_url))
+        event_url = unquote(requests[-1]["url"])
+        self.assertRegex(event_url, f"postURL/{other_url}$")
