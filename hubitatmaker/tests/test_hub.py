@@ -2,7 +2,7 @@ import asyncio
 import json
 from os.path import dirname, join
 import re
-from typing import Any, Coroutine, Dict, List, Union
+from typing import Any, Coroutine, Dict, List, Optional, Union
 from unittest import TestCase
 from unittest.mock import patch
 from urllib.parse import unquote
@@ -50,9 +50,19 @@ def wait_for(cr: Coroutine) -> Any:
 
 
 class FakeResponse:
-    def __init__(self, status=200, data: Union[str, Dict, List] = ""):
+    def __init__(
+        self,
+        status=200,
+        data: Union[str, Dict, List] = "",
+        method: str = "GET",
+        url: str = "/",
+        reason: str = "",
+    ):
         self.status = status
         self._data = data
+        self.method = method
+        self.url = url
+        self.reason = reason
 
     async def json(self):
         if isinstance(self._data, str):
@@ -72,52 +82,69 @@ class FakeServer:
 requests: List[Dict[str, Any]] = []
 
 
-class fake_request:
-    def __init__(self, method: str, url: str, **kwargs: Any):
-        if url.endswith("/hub/edit"):
-            self.response = FakeResponse(data=hub_edit_page)
-        elif url.endswith("/devices"):
-            self.response = FakeResponse(data=devices)
-        elif url.endswith("/modes"):
-            self.response = FakeResponse(data=modes)
-        elif url.endswith("/hsm"):
-            self.response = FakeResponse(data=hsm)
-        elif re.match(".*/modes/(\\d+)$", url):
-            mode_match = re.match(".*/modes/(\\d+)$", url)
-            mode_id = mode_match.group(1)
-            valid_mode = False
-            for mode in modes:
-                if mode["id"] == mode_id:
-                    valid_mode = True
-                    break
-            if valid_mode:
+def create_fake_request(responses: Optional[Dict] = {}):
+    class fake_request:
+        def __init__(self, method: str, url: str, **kwargs: Any):
+            if url.endswith("/hub/edit"):
+                if "/hub/edit" in responses:
+                    self.response = responses["/hub/edit"]
+                else:
+                    self.response = FakeResponse(data=hub_edit_page, url=url)
+            elif url.endswith("/devices"):
+                if "/devices" in responses:
+                    self.response = responses["/devices"]
+                else:
+                    self.response = FakeResponse(data=devices, url=url)
+            elif url.endswith("/modes"):
+                if "/modes" in responses:
+                    self.response = responses["/modes"]
+                else:
+                    self.response = FakeResponse(data=modes, url=url)
+            elif url.endswith("/hsm"):
+                if "/hsm" in responses:
+                    self.response = responses["/hsm"]
+                else:
+                    self.response = FakeResponse(data=hsm, url=url)
+            elif re.match(".*/modes/(\\d+)$", url):
+                mode_match = re.match(".*/modes/(\\d+)$", url)
+                mode_id = mode_match.group(1)
+                valid_mode = False
                 for mode in modes:
                     if mode["id"] == mode_id:
-                        mode["active"] = True
-                    else:
-                        mode["active"] = False
-            self.response = FakeResponse(data=modes)
-        elif re.match(".*/hsm/(\\w+)$", url):
-            hsm_match = re.match(".*/hsm/(\\w+)$", url)
-            hsm_mode = hsm_match.group(1)
-            new_mode = "disarmed"
-            if hsm_mode == HSM_DISARM:
+                        valid_mode = True
+                        break
+                if valid_mode:
+                    for mode in modes:
+                        if mode["id"] == mode_id:
+                            mode["active"] = True
+                        else:
+                            mode["active"] = False
+                self.response = FakeResponse(data=modes, url=url)
+            elif re.match(".*/hsm/(\\w+)$", url):
+                hsm_match = re.match(".*/hsm/(\\w+)$", url)
+                hsm_mode = hsm_match.group(1)
                 new_mode = "disarmed"
-            self.response = FakeResponse(data={"hsm": new_mode})
-        elif re.match(".*/devices/(\\d+)$", url):
-            dev_match = re.match(".*/devices/(\\d+)$", url)
-            dev_id = dev_match.group(1)
-            self.response = FakeResponse(data=device_details.get(dev_id, {}))
-        else:
-            self.response = FakeResponse(data="{}")
+                if hsm_mode == HSM_DISARM:
+                    new_mode = "disarmed"
+                self.response = FakeResponse(data={"hsm": new_mode}, url=url)
+            elif re.match(".*/devices/(\\d+)$", url):
+                dev_match = re.match(".*/devices/(\\d+)$", url)
+                dev_id = dev_match.group(1)
+                self.response = FakeResponse(
+                    data=device_details.get(dev_id, {}), url=url
+                )
+            else:
+                self.response = FakeResponse(data="{}", url=url)
 
-        requests.append({"method": method, "url": url, "data": kwargs})
+            requests.append({"method": method, "url": url, "data": kwargs})
 
-    async def __aenter__(self):
-        return self.response
+        async def __aenter__(self):
+            return self.response
 
-    async def __aexit__(self, exc_type, exc, tb):
-        pass
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+    return fake_request
 
 
 def fake_get_mac_address(**kwargs: str):
@@ -144,7 +171,7 @@ class TestHub(TestCase):
         self.assertEqual(list(hub.devices), [])
         self.assertEqual(hub.mac, "aa:bb:cc:dd:ee:ff")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_start_server(self, MockServer) -> None:
@@ -153,8 +180,8 @@ class TestHub(TestCase):
         wait_for(hub.start())
         self.assertTrue(MockServer.called)
 
-    @patch("aiohttp.request", new=fake_request)
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("hubitatmaker.server.Server")
     def test_start(self, MockServer) -> None:
         """start() should request data from the Hubitat hub."""
@@ -162,18 +189,34 @@ class TestHub(TestCase):
         wait_for(hub.start())
         # 13 requests:
         #   0: set event URL
-        #   1: request modes
-        #   2: request hsm status
-        #   3: request devices
-        #   4...: request device details
+        #   1: request devices
+        #   2...: request device details
+        #   -2: request modes
+        #   -1: request hsm status
         self.assertEqual(len(requests), 13)
-        self.assertRegex(requests[1]["url"], "modes$")
-        self.assertRegex(requests[2]["url"], "hsm$")
-        self.assertRegex(requests[3]["url"], "devices$")
-        self.assertRegex(requests[4]["url"], r"devices/\d+$")
-        self.assertRegex(requests[-1]["url"], r"devices/\d+$")
+        self.assertRegex(requests[1]["url"], "devices$")
+        self.assertRegex(requests[2]["url"], r"devices/\d+$")
+        self.assertRegex(requests[3]["url"], r"devices/\d+$")
+        self.assertRegex(requests[-2]["url"], "modes$")
+        self.assertRegex(requests[-1]["url"], "hsm$")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch(
+        "aiohttp.request",
+        new=create_fake_request({"/hsm": FakeResponse(400, url="/hsm")}),
+    )
+    @patch("hubitatmaker.server.Server")
+    def test_start_no_hsm(self, MockServer) -> None:
+        hub = Hub("1.2.3.4", "1234", "token")
+        wait_for(hub.start())
+        self.assertEqual(len(requests), 13)
+        self.assertRegex(requests[1]["url"], "devices$")
+        self.assertRegex(requests[2]["url"], r"devices/\d+$")
+        self.assertRegex(requests[3]["url"], r"devices/\d+$")
+        self.assertRegex(requests[-2]["url"], "modes$")
+        self.assertRegex(requests[-1]["url"], "hsm$")
+
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_default_event_url(self, MockServer) -> None:
@@ -184,7 +227,7 @@ class TestHub(TestCase):
         url = unquote(requests[0]["url"])
         self.assertRegex(url, r"http://127.0.0.1:81$")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_custom_event_url(self, MockServer) -> None:
@@ -195,7 +238,7 @@ class TestHub(TestCase):
         url = unquote(requests[0]["url"])
         self.assertRegex(url, r"http://foo\.local$")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_stop_server(self, MockServer) -> None:
@@ -206,7 +249,7 @@ class TestHub(TestCase):
         hub.stop()
         self.assertTrue(MockServer.return_value.stop.called)
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_devices_loaded(self, MockServer) -> None:
@@ -215,7 +258,7 @@ class TestHub(TestCase):
         wait_for(hub.start())
         self.assertEqual(len(hub.devices), 9)
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_event(self, MockServer) -> None:
@@ -231,7 +274,7 @@ class TestHub(TestCase):
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "on")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_mode_event(self, MockServer) -> None:
@@ -252,7 +295,7 @@ class TestHub(TestCase):
         hub._process_event(events["mode"])
         self.assertTrue(handler_called)
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_hsm_event(self, MockServer) -> None:
@@ -273,7 +316,7 @@ class TestHub(TestCase):
         hub._process_event(events["hsm"])
         self.assertTrue(handler_called)
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_other_event(self, MockServer) -> None:
@@ -289,7 +332,7 @@ class TestHub(TestCase):
         attr = device.attributes["switch"]
         self.assertEqual(attr.value, "off")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_set_hsm(self, MockServer) -> None:
@@ -303,7 +346,7 @@ class TestHub(TestCase):
         hub._process_event(events["hsm"])
         self.assertEqual(hub.hsm_status, "armedAway")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_set_mode(self, MockServer) -> None:
@@ -317,7 +360,7 @@ class TestHub(TestCase):
         hub._process_event(events["mode"])
         self.assertEqual(hub.mode, "Evening")
 
-    @patch("aiohttp.request", new=fake_request)
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_set_event_url(self, MockServer) -> None:

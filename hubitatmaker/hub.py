@@ -154,12 +154,20 @@ class Hub:
         """
         try:
             await self._start_server()
-            await self._load_modes()
-            await self._load_hsm_status()
             await self._load_devices()
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
+
+        try:
+            await self._load_modes()
+        except (aiohttp.ClientError, RequestError) as e:
+            _LOGGER.warning(f"Unable to access modes: {e}")
+
+        try:
+            await self._load_hsm_status()
+        except (aiohttp.ClientError, RequestError) as e:
+            _LOGGER.warning(f"Unable to access HSM status: {e}")
 
     def stop(self) -> None:
         """Remove all listeners and stop the event server (if running)."""
