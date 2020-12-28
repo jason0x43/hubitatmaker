@@ -134,7 +134,7 @@ from .error import ConnectionError, InvalidConfig, InvalidToken, RequestError
 from .hub import Hub
 from .types import Attribute, Device, Event
 
-__version__ = "0.4.5"
+__version__ = "0.5.0"
 
 __all__ = [
     "ATTR_ACCELERATION",
