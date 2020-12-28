@@ -145,6 +145,16 @@ class Hub:
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
 
+    async def load_devices(self, force_refresh=False) -> None:
+        """Load the current state of all devices."""
+        if force_refresh or len(self._devices) == 0:
+            devices: List[Dict[str, Any]] = await self._api_request("devices")
+            _LOGGER.debug("Loaded device list")
+
+            # load devices sequentially to avoid overloading the hub
+            for dev in devices:
+                await self._load_device(dev["id"], force_refresh)
+
     async def start(self) -> None:
         """Download initial state data, and start an event server if requested.
 
@@ -154,7 +164,7 @@ class Hub:
         """
         try:
             await self._start_server()
-            await self._load_devices()
+            await self.load_devices()
             _LOGGER.debug("Connected to Hubitat hub at %s", self.host)
         except aiohttp.ClientError as e:
             raise ConnectionError(str(e))
@@ -310,16 +320,6 @@ class Hub:
             return
 
         attr.update_value(value)
-
-    async def _load_devices(self, force_refresh=False) -> None:
-        """Load the current state of all devices."""
-        if force_refresh or len(self._devices) == 0:
-            devices: List[Dict[str, Any]] = await self._api_request("devices")
-            _LOGGER.debug("Loaded device list")
-
-            # load devices sequentially to avoid overloading the hub
-            for dev in devices:
-                await self._load_device(dev["id"], force_refresh)
 
     async def _load_device(self, device_id: str, force_refresh=False) -> None:
         """Return full info for a specific device."""
