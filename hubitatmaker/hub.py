@@ -1,14 +1,12 @@
 """Hubitat API."""
 from contextlib import contextmanager
 from logging import getLogger
-import re
 import socket
 from types import MappingProxyType
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Union
-from urllib.parse import quote, urlparse
+from urllib.parse import ParseResult, quote, urlparse
 
 import aiohttp
-import getmac
 
 from . import server
 from .const import ID_HSM_STATUS, ID_MODE
@@ -33,7 +31,6 @@ class Hub:
     host: str
     scheme: str
     token: str
-    mac: str
 
     _server: server.Server
 
@@ -63,11 +60,10 @@ class Hub:
         if not host or not app_id or not access_token:
             raise InvalidConfig()
 
-        self.event_url = event_url
-        self.port = port
+        self.event_url = self._get_event_url(port, event_url)
+        self.port = self._get_event_port(port, event_url)
         self.app_id = app_id
         self.token = access_token
-        self.mac = ""
 
         self.set_host(host)
 
@@ -228,8 +224,6 @@ class Hub:
         self.host = host_url.netloc or host_url.path
         self.base_url = f"{self.scheme}://{self.host}"
         self.api_url = f"{self.base_url}/apps/api/{self.app_id}"
-        self.mac = _get_mac_address(self.host) or ""
-        _LOGGER.debug("Set mac to %s", self.mac)
 
     async def set_port(self, port: int) -> None:
         """Set the port that the event listener server will listen on.
@@ -247,6 +241,35 @@ class Hub:
         An error will be raised if a test API request fails.
         """
         await self._api_request("devices")
+
+    def _get_event_port(
+        self, port: Optional[int], event_url: Optional[str]
+    ) -> Optional[int]:
+        """Given an optional port and event URL, return the event port"""
+        if port is not None:
+            return port
+        if event_url is not None:
+            u = urlparse(event_url)
+            return u.port
+        return None
+
+    def _get_event_url(
+        self, port: Optional[int], event_url: Optional[str]
+    ) -> Optional[str]:
+        """Given an optional port and event URL, return a complete event URL"""
+        if event_url is not None:
+            u = urlparse(event_url)
+            if u.port is None and port is not None:
+                return ParseResult(
+                    scheme=u.scheme,
+                    netloc=f"{u.hostname}:{port}",
+                    path=u.path,
+                    params=u.params,
+                    query=u.query,
+                    fragment=u.fragment,
+                ).geturl()
+            return event_url
+        return None
 
     def _process_event(self, event: Dict[str, Any]) -> None:
         """Process an event received from the hub."""
@@ -395,10 +418,3 @@ def _open_socket(*args: Any, **kwargs: Any) -> Iterator[socket.socket]:
         yield s
     finally:
         s.close()
-
-
-def _get_mac_address(host: str) -> Optional[str]:
-    """Return the mac address of a remote host."""
-    if re.match("\\d+\\.\\d+\\.\\d+\\.\\d+", host):
-        return getmac.get_mac_address(ip=host)
-    return getmac.get_mac_address(hostname=host)

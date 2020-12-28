@@ -147,10 +147,6 @@ def create_fake_request(responses: Optional[Dict] = {}):
     return fake_request
 
 
-def fake_get_mac_address(**kwargs: str):
-    return "aa:bb:cc:dd:ee:ff"
-
-
 class TestHub(TestCase):
     def setUp(self):
         global requests
@@ -164,15 +160,12 @@ class TestHub(TestCase):
         self.assertRaises(InvalidConfig, Hub, "1.2.3.4", "1234", "")
         Hub("1.2.3.4", "1234", "token")
 
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     def test_initial_values(self) -> None:
         """Hub properties should have expected initial values."""
         hub = Hub("1.2.3.4", "1234", "token")
         self.assertEqual(list(hub.devices), [])
-        self.assertEqual(hub.mac, "aa:bb:cc:dd:ee:ff")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_start_server(self, MockServer) -> None:
         """Hub should start a server when asked to."""
@@ -180,7 +173,6 @@ class TestHub(TestCase):
         wait_for(hub.start())
         self.assertTrue(MockServer.called)
 
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("aiohttp.request", new=create_fake_request())
     @patch("hubitatmaker.server.Server")
     def test_start(self, MockServer) -> None:
@@ -200,7 +192,6 @@ class TestHub(TestCase):
         self.assertRegex(requests[-2]["url"], "modes$")
         self.assertRegex(requests[-1]["url"], "hsm$")
 
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch(
         "aiohttp.request",
         new=create_fake_request({"/hsm": FakeResponse(400, url="/hsm")}),
@@ -217,7 +208,6 @@ class TestHub(TestCase):
         self.assertRegex(requests[-1]["url"], "hsm$")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_default_event_url(self, MockServer) -> None:
         """Default event URL should be server URL."""
@@ -228,7 +218,6 @@ class TestHub(TestCase):
         self.assertRegex(url, r"http://127.0.0.1:81$")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_custom_event_url(self, MockServer) -> None:
         """Event URL should be configurable."""
@@ -239,7 +228,43 @@ class TestHub(TestCase):
         self.assertRegex(url, r"http://foo\.local$")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("hubitatmaker.server.Server")
+    def test_custom_event_url_without_port(self, MockServer) -> None:
+        """Event URL should use custom port if none was provided."""
+        MockServer.return_value.url = "http://127.0.0.1:81"
+        hub = Hub("1.2.3.4", "1234", "token", 420, event_url="http://foo.local")
+        wait_for(hub.start())
+        url = unquote(requests[0]["url"])
+        self.assertRegex(url, r"http://foo\.local:420$")
+
+    @patch("aiohttp.request", new=create_fake_request())
+    @patch("hubitatmaker.server.Server")
+    def test_custom_event_port(self, MockServer) -> None:
+        """Event server port should be configurable."""
+        MockServer.return_value.url = "http://127.0.0.1:81"
+        hub = Hub("1.2.3.4", "1234", "token", 420)
+        wait_for(hub.start())
+        self.assertEqual(MockServer.call_args[0][2], 420)
+
+    @patch("aiohttp.request", new=create_fake_request())
+    @patch("hubitatmaker.server.Server")
+    def test_custom_event_port_from_url(self, MockServer) -> None:
+        """Event server port should come from event URL if none was provided."""
+        MockServer.return_value.url = "http://127.0.0.1:81"
+        hub = Hub("1.2.3.4", "1234", "token", event_url="http://foo.local:416")
+        wait_for(hub.start())
+        self.assertEqual(MockServer.call_args[0][2], 416)
+
+    @patch("aiohttp.request", new=create_fake_request())
+    @patch("hubitatmaker.server.Server")
+    def test_custom_event_port_and_url(self, MockServer) -> None:
+        """Explicit event server port should override port from URL."""
+        MockServer.return_value.url = "http://127.0.0.1:81"
+        hub = Hub("1.2.3.4", "1234", "token", 420, "http://foo.local:416")
+        wait_for(hub.start())
+        self.assertEqual(MockServer.call_args[0][2], 420)
+
+    @patch("aiohttp.request", new=create_fake_request())
     @patch("hubitatmaker.server.Server")
     def test_stop_server(self, MockServer) -> None:
         """Hub should stop a server when stopped."""
@@ -250,7 +275,6 @@ class TestHub(TestCase):
         self.assertTrue(MockServer.return_value.stop.called)
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_devices_loaded(self, MockServer) -> None:
         """Started hub should have parsed device info."""
@@ -259,7 +283,6 @@ class TestHub(TestCase):
         self.assertEqual(len(hub.devices), 9)
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_event(self, MockServer) -> None:
         """Started hub should process a device event."""
@@ -275,7 +298,6 @@ class TestHub(TestCase):
         self.assertEqual(attr.value, "on")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_mode_event(self, MockServer) -> None:
         """Started hub should emit mode events."""
@@ -296,7 +318,6 @@ class TestHub(TestCase):
         self.assertTrue(handler_called)
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_hsm_event(self, MockServer) -> None:
         """Started hub should emit HSM events."""
@@ -317,7 +338,6 @@ class TestHub(TestCase):
         self.assertTrue(handler_called)
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_other_event(self, MockServer) -> None:
         """Started hub should ignore non-device, non-mode events."""
@@ -333,7 +353,6 @@ class TestHub(TestCase):
         self.assertEqual(attr.value, "off")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_set_hsm(self, MockServer) -> None:
         """Started hub should allow mode to be updated."""
@@ -347,7 +366,6 @@ class TestHub(TestCase):
         self.assertEqual(hub.hsm_status, "armedAway")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_process_set_mode(self, MockServer) -> None:
         """Started hub should allow mode to be updated."""
@@ -361,7 +379,6 @@ class TestHub(TestCase):
         self.assertEqual(hub.mode, "Evening")
 
     @patch("aiohttp.request", new=create_fake_request())
-    @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("hubitatmaker.server.Server")
     def test_set_event_url(self, MockServer) -> None:
         """Started hub should allow mode to be updated."""
