@@ -289,7 +289,7 @@ class Hub:
             # to the modes list, and reload the modes
             if not mode_set:
                 self._modes.append(Mode({"active": True, "name": name}))
-                self._load_modes()
+                _ = self._load_modes()
 
             evt = Event(content)
 
@@ -344,9 +344,12 @@ class Hub:
 
     async def _load_modes(self) -> None:
         """Load the current hub mode."""
-        modes: List[Dict[str, Any]] = await self._api_request("modes")
-        _LOGGER.debug("Loaded modes")
-        self._modes = [Mode(m) for m in modes]
+        try:
+            modes: List[Dict[str, Any]] = await self._api_request("modes")
+            _LOGGER.debug("Loaded modes")
+            self._modes = [Mode(m) for m in modes]
+        except Exception as e:
+            _LOGGER.error("Error loading modes: %s", e)
 
     async def _api_request(self, path: str, method="GET") -> Any:
         """Make a Maker API request."""
