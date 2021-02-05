@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hubitatmaker"
-version = "0.5.2"
+version = "0.5.3"
 description = "A library for interfacing with Hubitat via its Maker API"
 authors = ["Jason Cheatham <jason@jasoncheatham.com>"]
 readme = "README.md"
