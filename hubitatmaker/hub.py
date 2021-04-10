@@ -171,12 +171,12 @@ class Hub:
 
         try:
             await self._load_modes()
-        except (aiohttp.ClientError, RequestError) as e:
+        except Exception as e:
             _LOGGER.warning(f"Unable to access modes: {e}")
 
         try:
             await self._load_hsm_status()
-        except (aiohttp.ClientError, RequestError) as e:
+        except Exception as e:
             _LOGGER.warning(f"Unable to access HSM status: {e}")
 
     def stop(self) -> None:
