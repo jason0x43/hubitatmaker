@@ -86,22 +86,22 @@ def create_fake_request(responses: Optional[Dict] = {}):
     class fake_request:
         def __init__(self, method: str, url: str, **kwargs: Any):
             if url.endswith("/hub/edit"):
-                if "/hub/edit" in responses:
+                if "/hub/edit" in responses.keys():
                     self.response = responses["/hub/edit"]
                 else:
                     self.response = FakeResponse(data=hub_edit_page, url=url)
             elif url.endswith("/devices"):
-                if "/devices" in responses:
+                if "/devices" in responses.keys():
                     self.response = responses["/devices"]
                 else:
                     self.response = FakeResponse(data=devices, url=url)
             elif url.endswith("/modes"):
-                if "/modes" in responses:
+                if "/modes" in responses.keys():
                     self.response = responses["/modes"]
                 else:
                     self.response = FakeResponse(data=modes, url=url)
             elif url.endswith("/hsm"):
-                if "/hsm" in responses:
+                if "/hsm" in responses.keys():
                     self.response = responses["/hsm"]
                 else:
                     self.response = FakeResponse(data=hsm, url=url)
