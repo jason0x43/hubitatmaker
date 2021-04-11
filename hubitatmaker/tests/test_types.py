@@ -16,3 +16,12 @@ class TestTypes(TestCase):
             f"{d}",
             '<Device id="6" name="Office Door" type="Generic Z-Wave Contact Sensor">',
         )
+
+    def test_device_records_last_update_time(self) -> None:
+        """A device should be serializable."""
+        d = Device(device_details["6"])
+        update = d.last_update
+        self.assertIsNotNone(update)
+
+        d.update_attr("contact", "closed")
+        self.assertNotEqual(update, d.last_update)
