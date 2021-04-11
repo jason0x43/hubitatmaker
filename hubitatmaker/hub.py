@@ -314,12 +314,9 @@ class Hub:
             return
 
         try:
-            attr = dev.attributes[attr_name]
+            dev.update_attr(attr_name, value)
         except KeyError:
             _LOGGER.warning("Tried to update unknown attribute %s", attr_name)
-            return
-
-        attr.update_value(value)
 
     async def _load_device(self, device_id: str, force_refresh=False) -> None:
         """Return full info for a specific device."""

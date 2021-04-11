@@ -1,3 +1,4 @@
+from time import time
 from types import MappingProxyType
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -63,8 +64,21 @@ class Device:
     def commands(self) -> Sequence[str]:
         return self._commands
 
-    def update_state(self, properties: Dict[str, Any]):
+    @property
+    def last_update(self) -> float:
+        """
+        Return the last time this device was updated as a unix timestamp.
+        """
+        return self._last_update
+
+    def update_attr(self, attr_name: str, value: Union[str, int]) -> None:
+        attr = self.attributes[attr_name]
+        attr.update_value(value)
+        self._last_update = time()
+
+    def update_state(self, properties: Dict[str, Any]) -> None:
         self._properties = properties
+        self._last_update = time()
 
         self._attributes: Dict[str, Attribute] = {}
         self._attributes_ro = MappingProxyType(self._attributes)
