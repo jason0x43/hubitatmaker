@@ -74,7 +74,9 @@ class Hub:
         self._devices: Dict[str, Device] = {}
         self._listeners: Dict[str, List[Listener]] = {}
         self._modes: List[Mode] = []
+        self._mode_supported = None
         self._hsm_status: Optional[str] = None
+        self._hsm_supported = None
 
         _LOGGER.info("Created hub %s", self)
 
@@ -96,6 +98,10 @@ class Hub:
         return None
 
     @property
+    def mode_supported(self) -> Optional[bool]:
+        return self._mode_supported
+
+    @property
     def modes(self) -> List[str]:
         """Return the available hub modes."""
         return [m.name for m in self._modes]
@@ -103,6 +109,10 @@ class Hub:
     @property
     def hsm_status(self) -> Optional[str]:
         return self._hsm_status
+
+    @property
+    def hsm_supported(self) -> Optional[bool]:
+        return self._hsm_supported
 
     def add_device_listener(self, device_id: str, listener: Listener) -> None:
         """Listen for updates for a particular device."""
@@ -162,6 +172,10 @@ class Hub:
         completed. Methods that rely on that data will raise an error if called
         before this method has completed.
         """
+
+        self._mode_supported = None
+        self._hsm_supported = None
+
         try:
             await self._start_server()
             await self.load_devices()
@@ -171,12 +185,16 @@ class Hub:
 
         try:
             await self._load_modes()
+            self._mode_supported = True
         except Exception as e:
+            self._mode_supported = False
             _LOGGER.warning(f"Unable to access modes: {e}")
 
         try:
             await self._load_hsm_status()
+            self._hsm_supported = True
         except Exception as e:
+            self._hsm_supported = False
             _LOGGER.warning(f"Unable to access HSM status: {e}")
 
     def stop(self) -> None:
