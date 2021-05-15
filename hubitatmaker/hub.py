@@ -74,7 +74,7 @@ class Hub:
         self._devices: Dict[str, Device] = {}
         self._listeners: Dict[str, List[Listener]] = {}
         self._modes: List[Mode] = []
-        self._hsm_status: str = "disarmed"
+        self._hsm_status: Optional[str] = None
 
         _LOGGER.info("Created hub %s", self)
 
@@ -101,7 +101,7 @@ class Hub:
         return [m.name for m in self._modes]
 
     @property
-    def hsm_status(self) -> str:
+    def hsm_status(self) -> Optional[str]:
         return self._hsm_status
 
     def add_device_listener(self, device_id: str, listener: Listener) -> None:
