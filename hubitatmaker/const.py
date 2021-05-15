@@ -117,6 +117,7 @@ CMD_UNLOCK = "unlock"
 CMD_SET_SPEED = "setSpeed"
 CMD_CYCLE_SPEED = "cycleSpeed"
 
+# See https://docs.hubitat.com/index.php?title=Hubitat®_Safety_Monitor_Interface
 HSM_ARM_ALL = "armAll"
 HSM_ARM_AWAY = "armAway"
 HSM_ARM_HOME = "armHome"
@@ -126,6 +127,15 @@ HSM_CANCEL_ALERTS = "cancelAlerts"
 HSM_DISARM = "disarm"
 HSM_DISARM_ALL = "disarmAll"
 HSM_DISARM_RULES = "disarmRules"
+
+HSM_STATUS_ARMED_AWAY = "armedAway"
+HSM_STATUS_ARMING_AWAY = "armingAway"
+HSM_STATUS_ARMED_HOME = "armedHome"
+HSM_STATUS_ARMING_HOME = "armingHome"
+HSM_STATUS_ARMED_NIGHT = "armedNight"
+HSM_STATUS_ARMING_NIGHT = "armingNight"
+HSM_STATUS_DISARMED = "disarmed"
+HSM_STATUS_ALL_DISARMED = "allDisarmed"
 
 ID_MODE = "hub_mode"
 ID_HSM_STATUS = "hub_hsm_status"
