@@ -34,10 +34,22 @@
       "data": null
     }
   },
-  "hsm": {
+  "hsmArmedAway": {
     "content": {
       "name": "hsmStatus",
       "value": "armedAway",
+      "displayName": "Home",
+      "deviceId": null,
+      "descriptionText": "hsmEvent",
+      "unit": null,
+      "type": null,
+      "data": null
+    }
+  },
+  "hsmAllDisarmed": {
+    "content": {
+      "name": "hsmStatus",
+      "value": "allDisarmed",
       "displayName": "Home",
       "deviceId": null,
       "descriptionText": "hsmEvent",

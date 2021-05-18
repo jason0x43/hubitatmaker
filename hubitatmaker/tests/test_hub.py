@@ -209,12 +209,20 @@ class TestHub(TestCase):
     def test_start_no_hsm(self, MockServer) -> None:
         hub = Hub("1.2.3.4", "1234", "token")
         wait_for(hub.start())
-        self.assertEqual(len(requests), 13)
-        self.assertRegex(requests[1]["url"], "devices$")
-        self.assertRegex(requests[2]["url"], r"devices/\d+$")
-        self.assertRegex(requests[3]["url"], r"devices/\d+$")
-        self.assertRegex(requests[-2]["url"], "modes$")
-        self.assertRegex(requests[-1]["url"], "hsm$")
+        self.assertFalse(hub.hsm_supported)
+        self.assertTrue(hub.mode_supported)
+
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch(
+        "aiohttp.request",
+        new=create_fake_request({"/modes": FakeResponse(400, url="/modes")}),
+    )
+    @patch("hubitatmaker.server.Server")
+    def test_start_no_mode(self, MockServer) -> None:
+        hub = Hub("1.2.3.4", "1234", "token")
+        wait_for(hub.start())
+        self.assertTrue(hub.hsm_supported)
+        self.assertFalse(hub.mode_supported)
 
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("aiohttp.request", new=create_fake_request())
@@ -350,11 +358,11 @@ class TestHub(TestCase):
             nonlocal handler_called
             handler_called = True
 
-        hub._process_event(events["hsm"])
+        hub._process_event(events["hsmArmedAway"])
         self.assertFalse(handler_called)
 
         hub.add_hsm_listener(listener)
-        hub._process_event(events["hsm"])
+        hub._process_event(events["hsmArmedAway"])
         self.assertTrue(handler_called)
 
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
@@ -384,8 +392,8 @@ class TestHub(TestCase):
         wait_for(hub.set_hsm(HSM_DISARM))
         self.assertRegex(requests[-1]["url"], f"hsm/{HSM_DISARM}$")
 
-        hub._process_event(events["hsm"])
-        self.assertEqual(hub.hsm_status, "armedAway")
+        hub._process_event(events["hsmAllDisarmed"])
+        self.assertEqual(hub.hsm_status, "allDisarmed")
 
     @patch("getmac.get_mac_address", new=fake_get_mac_address)
     @patch("aiohttp.request", new=create_fake_request())
@@ -405,7 +413,7 @@ class TestHub(TestCase):
     @patch("aiohttp.request", new=create_fake_request())
     @patch("hubitatmaker.server.Server")
     def test_set_event_url(self, MockServer) -> None:
-        """Started hub should allow mode to be updated."""
+        """Started hub should allow event URL to be set."""
         server_url = "http://127.0.0.1:81"
         MockServer.return_value.url = server_url
         hub = Hub("1.2.3.4", "1234", "token")
@@ -419,3 +427,34 @@ class TestHub(TestCase):
         wait_for(hub.set_event_url(other_url))
         event_url = unquote(requests[-1]["url"])
         self.assertRegex(event_url, f"postURL/{other_url}$")
+
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("aiohttp.request", new=create_fake_request())
+    @patch("hubitatmaker.server.Server")
+    def test_set_port(self, MockServer) -> None:
+        """Started hub should allow port to be set."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        wait_for(hub.start())
+        self.assertEqual(MockServer.call_args[0][2], 0)
+        wait_for(hub.set_port(14))
+        self.assertEqual(MockServer.call_args[0][2], 14)
+
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("aiohttp.request", new=create_fake_request())
+    @patch("hubitatmaker.server.Server")
+    def test_hsm_is_supported(self, MockServer) -> None:
+        """hub should indicate if HSM is supported."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        self.assertIsNone(hub.hsm_supported)
+        wait_for(hub.start())
+        self.assertTrue(hub.hsm_supported)
+
+    @patch("getmac.get_mac_address", new=fake_get_mac_address)
+    @patch("aiohttp.request", new=create_fake_request())
+    @patch("hubitatmaker.server.Server")
+    def test_mode_is_supported(self, MockServer) -> None:
+        """hub should indicate if HSM is supported."""
+        hub = Hub("1.2.3.4", "1234", "token")
+        self.assertIsNone(hub.mode_supported)
+        wait_for(hub.start())
+        self.assertTrue(hub.mode_supported)

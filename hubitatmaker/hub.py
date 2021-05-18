@@ -264,6 +264,7 @@ class Hub:
         Setting this will stop and restart the event listener server.
         """
         self.port = port
+        _LOGGER.info("Setting port to %s", port)
         if self._server:
             self._server.stop()
         await self._start_server()
@@ -359,12 +360,9 @@ class Hub:
 
     async def _load_modes(self) -> None:
         """Load the current hub mode."""
-        try:
-            modes: List[Dict[str, Any]] = await self._api_request("modes")
-            _LOGGER.debug("Loaded modes")
-            self._modes = [Mode(m) for m in modes]
-        except Exception as e:
-            _LOGGER.error("Error loading modes: %s", e)
+        modes: List[Dict[str, Any]] = await self._api_request("modes")
+        _LOGGER.debug("Loaded modes")
+        self._modes = [Mode(m) for m in modes]
 
     async def _api_request(self, path: str, method="GET") -> Any:
         """Make a Maker API request."""
