@@ -1,7 +1,8 @@
 import asyncio
+from asyncio.base_events import Server as AsyncioServer
 from socket import socket as Socket
 import threading
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, cast
 
 from aiohttp import web
 
@@ -65,7 +66,7 @@ class Server:
         # If the Server was initialized with port 0, determine what port the
         # underlying server ended up listening on
         if self.port == 0:
-            site_server = cast(asyncio.AbstractServer, site._server)
+            site_server = cast(AsyncioServer, site._server)
             sockets = cast(List[Socket], site_server.sockets)
             socket = sockets[0]
             self.port = socket.getsockname()[1]
