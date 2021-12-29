@@ -36,11 +36,11 @@ See the [API doc](doc/api.md).
 To get setup for development, run
 
 ```
-$ poetry run init
+$ pdm run init
 ```
 
 To test the code, which will type check it and run unit tests, run
 
 ```
-$ poetry run test
+$ pdm run test
 ```

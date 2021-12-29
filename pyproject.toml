@@ -1,39 +1,72 @@
-[tool.poetry]
+[project]
 name = "hubitatmaker"
 version = "0.5.7"
 description = "A library for interfacing with Hubitat via its Maker API"
-authors = ["Jason Cheatham <jason@jasoncheatham.com>"]
-readme = "README.md"
-homepage = "https://github.com/jason0x43/hubitatmaker"
-repository = "https://github.com/jason0x43/hubitatmaker"
-keywords = ["hubitat"]
-license = "MIT"
-classifiers = [
-	"Development Status :: 3 - Alpha",
-	"Programming Language :: Python :: 3",
-	"License :: OSI Approved :: MIT License",
-	"Operating System :: OS Independent",
+authors = [
+    {name = "Jason Cheatham", email = "jason@jasoncheatham.com"},
 ]
-include = ["LICENSE"]
+dependencies = ["aiohttp<4.0.0,>=3.6.2", "getmac<1.0.0,>=0.8.2"]
+requires-python = ">=3.8,<4.0"
+license = {text = "MIT"}
+readme = "README.md"
 
-[tool.poetry.dependencies]
-aiohttp = "^3.6.2"
-python = "^3.7.1"
-getmac = "^0.8.2"
+[project.urls]
+homepage = ""
 
-[tool.poetry.dev-dependencies]
-flake8 = "^3.8.3"
-black = "^20.8b1"
-pre-commit = "^2.7.1"
-isort = "^5.5.2"
-toml = "^0.10.1"
-pytest = "^6.0"
+[project.optional-dependencies]
 
-[tool.poetry.scripts]
-init = "scripts:init"
-publish = "scripts:publish"
-test = "scripts:test"
+[tool.pdm]
+includes = []
+
+[tool.pdm.scripts]
+init = { shell = "pdm install && pre-commit install" }
+test = { shell = "pyright && pytest" }
+publish = "python scripts/publish.py"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "flake8<4.0.0,>=3.8.3",
+    "black<21.0,>=20.8b1",
+    "pre-commit<3.0.0,>=2.7.1",
+    "isort<6.0.0,>=5.5.2",
+    "toml>=0.10.2",
+    "pytest<7.0,>=6.0",
+    "pytest-asyncio>=0.16.0",
+    "twine>=3.7.1",
+]
 
 [build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+requires = ["pdm-pep517"]
+build-backend = "pdm.pep517.api"
+
+[tool.pyright]
+include = ["hubitatmaker"]
+exclude = ["**/__pycache__"]
+extraPaths = [
+    "__pypackages__/3.8/lib"
+]
+stubPath = "."
+
+[tool.pytest.ini_options]
+testpaths = "hubitatmaker"
+python_files = "test_*.py"
+
+[tool.isort]
+# https://github.com/timothycrosley/isort
+# https://github.com/timothycrosley/isort/wiki/isort-Settings
+# splits long import on multiple lines indented by 4 spaces
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+indent = "    "
+# by default isort don't check module indexes
+# not_skip = __init__.py
+# will group `import x` and `from x import` of the same module.
+force_sort_within_sections = true
+# sections = FUTURE,STDLIB,INBETWEENS,THIRDPARTY,FIRSTPARTY,LOCALFOLDER
+default_section = "THIRDPARTY"
+known_first_party = "hubitatmaker,tests"
+forced_separate = "tests"
+combine_as_imports = true
