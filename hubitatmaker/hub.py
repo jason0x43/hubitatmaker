@@ -63,6 +63,13 @@ class Hub:
         if not host or not app_id or not access_token:
             raise InvalidConfig()
 
+        self._devices: Dict[str, Device] = {}
+        self._listeners: Dict[str, List[Listener]] = {}
+        self._modes: List[Mode] = []
+        self._mode_supported = None
+        self._hsm_status: Optional[str] = None
+        self._hsm_supported = None
+
         self.event_url = _get_event_url(port, event_url)
         self.port = _get_event_port(port, event_url)
         self.app_id = app_id
@@ -70,13 +77,6 @@ class Hub:
         self.mac = ""
 
         self.set_host(host)
-
-        self._devices: Dict[str, Device] = {}
-        self._listeners: Dict[str, List[Listener]] = {}
-        self._modes: List[Mode] = []
-        self._mode_supported = None
-        self._hsm_status: Optional[str] = None
-        self._hsm_supported = None
 
         _LOGGER.info("Created hub %s", self)
 
