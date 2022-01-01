@@ -25,5 +25,8 @@ if call("twine upload dist/*", shell=True):
 if call(f"git tag {pkg_version}", shell=True):
     exit(1)
 
+if call("git push", shell=True):
+    exit(1)
+
 if call("git push --tags", shell=True):
     exit(1)

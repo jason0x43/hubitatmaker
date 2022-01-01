@@ -1,4 +1,4 @@
-__version__ = "0.5.8rc0"
+__version__ = "0.5.8"
 
 from .const import (
     ATTR_ACCELERATION,
