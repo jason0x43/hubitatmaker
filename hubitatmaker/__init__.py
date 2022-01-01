@@ -1,3 +1,5 @@
+__version__ = "0.5.8rc0"
+
 from .const import (
     ATTR_ACCELERATION,
     ATTR_ALARM,
@@ -162,8 +164,6 @@ from .error import ConnectionError, InvalidConfig, InvalidToken, RequestError
 from .hub import Hub
 from .types import Attribute, Device, Event
 
-__version__ = "0.5.7"
-
 __all__ = [
     "ATTR_ACCELERATION",
     "ATTR_ALARM",
@@ -221,7 +221,7 @@ __all__ = [
     "CAP_DOOR_CONTROL",
     "CAP_DOUBLE_TAPABLE_BUTTON",
     "CAP_ENERGY_METER",
-    "CAP_ENERGY_SOURCE",    
+    "CAP_ENERGY_SOURCE",
     "CAP_FAN_CONTROL",
     "CAP_GARAGE_DOOR_CONTROL",
     "CAP_HOLDABLE_BUTTON",

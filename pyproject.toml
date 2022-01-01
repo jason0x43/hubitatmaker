@@ -1,6 +1,5 @@
 [project]
 name = "hubitatmaker"
-version = "0.5.7"
 description = "A library for interfacing with Hubitat via its Maker API"
 authors = [
     {name = "Jason Cheatham", email = "jason@jasoncheatham.com"},
@@ -8,14 +7,24 @@ authors = [
 dependencies = ["aiohttp<4.0.0,>=3.6.2", "getmac<1.0.0,>=0.8.2"]
 requires-python = ">=3.8,<4.0"
 license = {text = "MIT"}
+dynamic = ["version"]
+keywords = ["hubitat"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Home Automation",
+    "Typing :: Typed"
+]
 readme = "README.md"
 
 [project.urls]
-homepage = ""
-
-[project.optional-dependencies]
+homepage = "https://github.com/jason0x43/hubitatmaker"
 
 [tool.pdm]
+version = {from = "hubitatmaker/__init__.py"}
 includes = []
 
 [tool.pdm.scripts]
