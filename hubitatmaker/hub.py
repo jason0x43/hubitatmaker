@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from logging import getLogger
 import re
 import socket
+from ssl import SSLContext
 from types import MappingProxyType
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Union
 from urllib.parse import ParseResult, quote, urlparse
@@ -44,6 +45,7 @@ class Hub:
         access_token: str,
         port: int = None,
         event_url: str = None,
+        ssl_context: SSLContext = None
     ):
         """Initialize a Hubitat hub interface.
 
@@ -59,6 +61,9 @@ class Hub:
           The port to listen on for events (optional). Defaults to a random open port.
         event_url:
           The URL that Hubitat should send events to (optional). Defaults the server's actual address and port.
+        ssl_context:
+          The SSLContext the event listener server will use. Passing in a SSLContext object
+          will make the event listener server HTTPS only.
         """
         if not host or not app_id or not access_token:
             raise InvalidConfig()
@@ -75,6 +80,7 @@ class Hub:
         self.app_id = app_id
         self.token = access_token
         self.mac = ""
+        self.ssl_context = ssl_context
 
         self.set_host(host)
 
@@ -268,6 +274,24 @@ class Hub:
         if self._server:
             self._server.stop()
         await self._start_server()
+    
+    async def set_ssl_context(self, ssl_context: Optional[SSLContext]) -> None:
+        """Set the SSLContext that the event listener server will use. Passing in a SSLContext object
+        will make the event listener server HTTPS only. Passing in None will revert the server back 
+        to HTTP.
+
+        Setting this will stop and restart the event listener server.
+        """
+        self.ssl_context = ssl_context
+
+        if ssl_context is None:
+            _LOGGER.debug("Disabling SSL for event listener server")
+        else:
+            _LOGGER.debug("Enabling SSL for event listener server")
+
+        if self._server:
+            self._server.stop()
+        await self._start_server()
 
     async def _check_api(self) -> None:
         """Check for api access.
@@ -394,10 +418,15 @@ class Hub:
             address = s.getsockname()[0]
 
         self._server = server.create_server(
-            self._process_event, address, self.port or 0
+            self._process_event, address, self.port or 0, self.ssl_context
         )
         self._server.start()
-        _LOGGER.debug("Listening on %s:%d", address, self._server.port)
+        _LOGGER.debug(
+            "Listening on %s:%d with SSL %s", 
+            address, 
+            self._server.port, 
+            "disabled" if self.ssl_context is None else "enabled"
+        )
 
         await self.set_event_url(self.event_url)
 
