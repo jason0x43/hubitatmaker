@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Union
 from urllib.parse import ParseResult, quote, urlparse
 
+import asyncio
 import aiohttp
 import getmac
 
@@ -18,6 +19,8 @@ from .types import Device, Event, Mode
 
 Listener = Callable[[Event], None]
 
+MAX_REQUEST_ATTEMPT_COUNT = 3
+REQUEST_RETRY_DELAY_INTERVAL = 0.5
 
 _LOGGER = getLogger(__name__)
 
@@ -391,22 +394,47 @@ class Hub:
     async def _api_request(self, path: str, method="GET") -> Any:
         """Make a Maker API request."""
         params = {"access_token": self.token}
-        conn = aiohttp.TCPConnector(ssl=False)
-        try:
-            async with aiohttp.request(
-                method, f"{self.api_url}/{path}", params=params, connector=conn
-            ) as resp:
-                if resp.status >= 400:
-                    if resp.status == 401:
-                        raise InvalidToken()
-                    else:
+
+        attempt = 0
+        while attempt <= MAX_REQUEST_ATTEMPT_COUNT:
+            attempt += 1
+            conn = aiohttp.TCPConnector(ssl=False)
+            try:
+                async with aiohttp.request(
+                    method, f"{self.api_url}/{path}", params=params, connector=conn
+                ) as resp:
+                    if resp.status >= 400:
+                        # retry on server errors or request timeout w/ increasing delay
+                        if resp.status >= 500 or resp.status == 408:
+                            if attempt < MAX_REQUEST_ATTEMPT_COUNT:
+                                _LOGGER.debug(
+                                    "%s request to %s failed with code %d: %s. Retrying...",
+                                    method, path, resp.status, resp.reason
+                                )
+                                await asyncio.sleep(attempt * REQUEST_RETRY_DELAY_INTERVAL)
+                                continue
+
+                        if resp.status == 401:
+                            raise InvalidToken()
+                        else:
+                            raise RequestError(resp)
+                    json = await resp.json()
+                    if "error" in json and json["error"]:
                         raise RequestError(resp)
-                json = await resp.json()
-                if "error" in json and json["error"]:
-                    raise RequestError(resp)
-                return json
-        finally:
-            await conn.close()
+                    return json
+            except (aiohttp.ClientConnectionError, asyncio.TimeoutError) as e:
+                # catch connection exceptions to retry w/ increasing delay
+                if attempt < MAX_REQUEST_ATTEMPT_COUNT:
+                    _LOGGER.debug(
+                        "%s request to %s failed with %s. Retrying...",
+                        method, path, str(e)
+                    )
+                    await asyncio.sleep(attempt * REQUEST_RETRY_DELAY_INTERVAL)
+                    continue
+                else:
+                    raise e
+            finally:
+                await conn.close()
 
     async def _start_server(self) -> None:
         """Start an event listener server."""
