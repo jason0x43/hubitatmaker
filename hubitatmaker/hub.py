@@ -43,9 +43,9 @@ class Hub:
         host: str,
         app_id: str,
         access_token: str,
-        port: int = None,
-        event_url: str = None,
-        ssl_context: SSLContext = None
+        port: Optional[int] = None,
+        event_url: Optional[str] = None,
+        ssl_context: Optional[SSLContext] = None,
     ):
         """Initialize a Hubitat hub interface.
 
@@ -274,10 +274,10 @@ class Hub:
         if self._server:
             self._server.stop()
         await self._start_server()
-    
+
     async def set_ssl_context(self, ssl_context: Optional[SSLContext]) -> None:
         """Set the SSLContext that the event listener server will use. Passing in a SSLContext object
-        will make the event listener server HTTPS only. Passing in None will revert the server back 
+        will make the event listener server HTTPS only. Passing in None will revert the server back
         to HTTP.
 
         Setting this will stop and restart the event listener server.
@@ -422,10 +422,10 @@ class Hub:
         )
         self._server.start()
         _LOGGER.debug(
-            "Listening on %s:%d with SSL %s", 
-            address, 
-            self._server.port, 
-            "disabled" if self.ssl_context is None else "enabled"
+            "Listening on %s:%d with SSL %s",
+            address,
+            self._server.port,
+            "disabled" if self.ssl_context is None else "enabled",
         )
 
         await self.set_event_url(self.event_url)

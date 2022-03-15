@@ -3,7 +3,7 @@ from asyncio.base_events import Server as AsyncioServer
 from socket import socket as Socket
 from ssl import SSLContext
 import threading
-from typing import Any, Callable, Dict, List, cast
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from aiohttp import web
 
@@ -13,7 +13,13 @@ EventCallback = Callable[[Dict[str, Any]], None]
 class Server:
     """A handle to a running server."""
 
-    def __init__(self, handle_event: EventCallback, host: str, port: int, ssl_context: SSLContext = None):
+    def __init__(
+        self,
+        handle_event: EventCallback,
+        host: str,
+        port: int,
+        ssl_context: Optional[SSLContext] = None,
+    ):
         """Initialize a Server."""
         self.host = host
         self.port = port
@@ -63,7 +69,9 @@ class Server:
         asyncio.set_event_loop(self._server_loop)
         self._server_loop.run_until_complete(self._runner.setup())
 
-        site = web.TCPSite(self._runner, self.host, self.port, ssl_context=self.ssl_context)
+        site = web.TCPSite(
+            self._runner, self.host, self.port, ssl_context=self.ssl_context
+        )
         self._server_loop.run_until_complete(site.start())
 
         # If the Server was initialized with port 0, determine what port the
@@ -84,7 +92,10 @@ class Server:
 
 
 def create_server(
-    handle_event: EventCallback, host: str = "0.0.0.0", port: int = 0, ssl_context: SSLContext = None
+    handle_event: EventCallback,
+    host: str = "0.0.0.0",
+    port: int = 0,
+    ssl_context: Optional[SSLContext] = None,
 ) -> Server:
     """Create a new server."""
     return Server(handle_event, host, port, ssl_context)
