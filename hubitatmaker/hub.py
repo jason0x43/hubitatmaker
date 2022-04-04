@@ -1,4 +1,5 @@
 """Hubitat API."""
+import asyncio
 from contextlib import contextmanager
 from logging import getLogger
 import re
@@ -8,8 +9,8 @@ from types import MappingProxyType
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Union
 from urllib.parse import ParseResult, quote, urlparse
 
-import asyncio
 import aiohttp
+from aiohttp.client_exceptions import ContentTypeError
 import getmac
 
 from . import server
@@ -409,25 +410,44 @@ class Hub:
                             if attempt < MAX_REQUEST_ATTEMPT_COUNT:
                                 _LOGGER.debug(
                                     "%s request to %s failed with code %d: %s. Retrying...",
-                                    method, path, resp.status, resp.reason
+                                    method,
+                                    path,
+                                    resp.status,
+                                    resp.reason,
                                 )
-                                await asyncio.sleep(attempt * REQUEST_RETRY_DELAY_INTERVAL)
+                                await asyncio.sleep(
+                                    attempt * REQUEST_RETRY_DELAY_INTERVAL
+                                )
                                 continue
 
                         if resp.status == 401:
                             raise InvalidToken()
                         else:
                             raise RequestError(resp)
-                    json = await resp.json()
-                    if "error" in json and json["error"]:
+
+                    json = None
+
+                    try:
+                        json = await resp.json()
+                    except Exception as e:
+                        if isinstance(e, ContentTypeError):
+                            text = await resp.text()
+                            _LOGGER.debug(f"Error parsing JSON from: {text}")
+                        else:
+                            raise e
+
+                    if json and "error" in json and json["error"]:
                         raise RequestError(resp)
+
                     return json
             except (aiohttp.ClientConnectionError, asyncio.TimeoutError) as e:
                 # catch connection exceptions to retry w/ increasing delay
                 if attempt < MAX_REQUEST_ATTEMPT_COUNT:
                     _LOGGER.debug(
                         "%s request to %s failed with %s. Retrying...",
-                        method, path, str(e)
+                        method,
+                        path,
+                        str(e),
                     )
                     await asyncio.sleep(attempt * REQUEST_RETRY_DELAY_INTERVAL)
                     continue
